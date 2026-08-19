@@ -1,4 +1,3 @@
-
 // Configuração de Conexão com o Supabase
 const SUPABASE_URL = 'https://enjfjdrfkilbwilqehik.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuamZqZHJma2lsYndpbHFlaGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMwODQsImV4cCI6MjEwMjcxOTA4NH0.vq1rrVcLqOO6z1IuMr_uH_tx5_VIXzRPZuPmuiosr9I';
@@ -173,11 +172,29 @@ async function populateSelects() {
     }
 }
 
+
+// ALTERNAR VISIBILIDADE DO CAMPO DE VALOR E FORMA DE PAGAMENTO NO CHECK-IN
+function toggleValorAvulso() {
+    const tipo = document.getElementById('selectTipoCobranca').value;
+    const groupValor = document.getElementById('groupValorAvulso');
+    const groupPagto = document.getElementById('groupFormaPagamentoAvulso');
+    
+    if (tipo === 'avulso') {
+        groupValor.style.display = 'block';
+        groupPagto.style.display = 'block';
+    } else {
+        groupValor.style.display = 'none';
+        groupPagto.style.display = 'none';
+    }
+}
+
 // MODAIS
 function openModal(id) {
     populateSelects();
+    if(id === 'modalAtendimento') toggleValorAvulso();
     document.getElementById(id).style.display = 'flex';
 }
+
 function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
@@ -257,7 +274,7 @@ async function salvarCheckin() {
             .from('caixa_lancamentos')
             .insert([{
                 descricao: `Atendimento Avulso - ${petObj ? petObj.nome : ''}`,
-                forma_pagamento: "PIX",
+                forma_pagamento: document.getElementById('pagamentoAvulso').value || "PIX",
                 valor: valor
             }]);
     }
