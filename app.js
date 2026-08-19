@@ -1,8 +1,14 @@
-// Configuração de Conexão com o Supabase
+// Configuração de Conexão com o Supabase (Escopo Global Seguro)
 const SUPABASE_URL = 'https://enjfjdrfkilbwilqehik.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuamZqZHJma2lsYndpbHFlaGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMwODQsImV4cCI6MjEwMjcxOTA4NH0.vq1rrVcLqOO6z1IuMr_uH_tx5_VIXzRPZuPmuiosr9I';
 
-const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Garantia de inicialização global sem temporal dead zone
+var _supabase;
+if (typeof supabase !== 'undefined') {
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} else {
+    console.error('A biblioteca do Supabase JS não foi carregada antes do app.js!');
+}
 
 // Cache local temporário após busca do banco
 let cadastros = [];
