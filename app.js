@@ -1,13 +1,22 @@
-// Configuração de Conexão com o Supabase (Escopo Global Seguro)
+// Configuração de Conexão com o Supabase
 const SUPABASE_URL = 'https://enjfjdrfkilbwilqehik.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVuamZqZHJma2lsYndpbHFlaGlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcxNDMwODQsImV4cCI6MjEwMjcxOTA4NH0.vq1rrVcLqOO6z1IuMr_uH_tx5_VIXzRPZuPmuiosr9I';
 
-// Garantia de inicialização global sem temporal dead zone
-var _supabase;
-if (typeof supabase !== 'undefined') {
-    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-} else {
-    console.error('A biblioteca do Supabase JS não foi carregada antes do app.js!');
+var _supabase = null;
+
+// Função para garantir a inicialização da conexão antes de usar
+function getSupabase() {
+    if (!_supabase) {
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } else if (window.supabase && window.supabase.createClient) {
+            _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } else {
+            alert('A biblioteca do Supabase não foi carregada. Verifique se o script CDN está no <head> do index.html.');
+            throw new Error('Supabase SDK não carregado');
+        }
+    }
+    return _supabase;
 }
 
 // Cache local temporário após busca do banco
@@ -22,47 +31,54 @@ function switchTab(tabId) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     
     document.getElementById(`sec-${tabId}`).classList.add('active');
-    event.currentTarget.classList.add('active');
+    if (event && event.currentTarget) event.currentTarget.classList.add('active');
 
-    if(tabId === 'atendimentos') carregarDadosAtendimentos();
-    if(tabId === 'caixa') carregarCaixa();
+    if (tabId === 'atendimentos') carregarDadosAtendimentos();
+    if (tabId === 'caixa') carregarCaixa();
 }
 
 // 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
-    // Buscar Atendimentos de Hoje
-    const { data: dataAtend, error: errAtend } = await _supabase
-        .from('atendimentos')
-        .select(`
-            id, servico, tipo, status, valor, data_entrada,
-            pets ( nome, tutores ( nome ) )
-        `)
-        .order('data_entrada', { ascending: false });
+    try {
+        const client = getSupabase();
+        
+        // Buscar Atendimentos de Hoje
+        const { data: dataAtend, error: errAtend } = await client
+            .from('atendimentos')
+            .select(`
+                id, servico, tipo, status, valor, data_entrada,
+                pets ( nome, tutores ( nome ) )
+            `)
+            .order('data_entrada', { ascending: false });
 
-    if (!errAtend) atendimentos = dataAtend || [];
+        if (!errAtend) atendimentos = dataAtend || [];
 
-    // Buscar Pacotes Ativos
-    const { data: dataPkg, error: errPkg } = await _supabase
-        .from('pacotes')
-        .select(`
-            id, quantidade_total, quantidade_usada, status,
-            pets ( nome, tutores ( nome ) )
-        `)
-        .eq('status', 'ativo');
+        // Buscar Pacotes Ativos
+        const { data: dataPkg, error: errPkg } = await client
+            .from('pacotes')
+            .select(`
+                id, quantidade_total, quantidade_usada, status,
+                pets ( nome, tutores ( nome ) )
+            `)
+            .eq('status', 'ativo');
 
-    if (!errPkg) pacotes = dataPkg || [];
+        if (!errPkg) pacotes = dataPkg || [];
 
-    renderAtendimentos();
-    renderPacotes();
+        renderAtendimentos();
+        renderPacotes();
+    } catch (e) {
+        console.error('Erro ao carregar atendimentos:', e);
+    }
 }
 
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
+    if (!list) return;
     list.innerHTML = '';
 
     const filtered = filter === 'todos' ? atendimentos : atendimentos.filter(a => a.tipo === filter);
 
-    if(filtered.length === 0) {
+    if (filtered.length === 0) {
         list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento registrado.</p>`;
         return;
     }
@@ -71,7 +87,7 @@ function renderAtendimentos(filter = 'todos') {
         const isPkg = item.tipo === 'pacote';
         const petNome = item.pets ? item.pets.nome : 'Pet';
         const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
-        const hora = new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' });
+        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
 
         list.innerHTML += `
             <div class="service-item">
@@ -83,7 +99,7 @@ function renderAtendimentos(filter = 'todos') {
                     </div>
                 </div>
                 <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
-                    ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor).toFixed(2)}
+                    ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
                 </span>
             </div>
         `;
@@ -92,9 +108,10 @@ function renderAtendimentos(filter = 'todos') {
 
 function renderPacotes() {
     const list = document.getElementById('packageList');
+    if (!list) return;
     list.innerHTML = '';
 
-    if(pacotes.length === 0) {
+    if (pacotes.length === 0) {
         list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum pacote ativo.</p>`;
         return;
     }
@@ -120,25 +137,31 @@ function renderPacotes() {
 
 // 2. CARREGAR CAIXA DO SUPABASE
 async function carregarCaixa() {
-    const { data, error } = await _supabase
-        .from('caixa_lancamentos')
-        .select('*')
-        .order('data_lancamento', { ascending: false });
+    try {
+        const client = getSupabase();
+        const { data, error } = await client
+            .from('caixa_lancamentos')
+            .select('*')
+            .order('data_lancamento', { ascending: false });
 
-    if(!error) caixaLancamentos = data || [];
-    renderCaixa();
+        if (!error) caixaLancamentos = data || [];
+        renderCaixa();
+    } catch (e) {
+        console.error('Erro ao carregar caixa:', e);
+    }
 }
 
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
+    if (!list) return;
     list.innerHTML = '';
     
     let total = 0, pix = 0, outros = 0;
 
     caixaLancamentos.forEach(c => {
-        const v = parseFloat(c.valor);
+        const v = parseFloat(c.valor || 0);
         total += v;
-        if(c.forma_pagamento === 'PIX') pix += v;
+        if (c.forma_pagamento === 'PIX') pix += v;
         else outros += v;
 
         list.innerHTML += `
@@ -161,23 +184,28 @@ function renderCaixa() {
 async function populateSelects() {
     const selCheckin = document.getElementById('selectPetCheckin');
     const selPacote = document.getElementById('selectPetPacote');
+    if (!selCheckin || !selPacote) return;
     selCheckin.innerHTML = ''; selPacote.innerHTML = '';
 
-    const { data, error } = await _supabase
-        .from('pets')
-        .select(`id, nome, tutores ( nome )`);
+    try {
+        const client = getSupabase();
+        const { data, error } = await client
+            .from('pets')
+            .select(`id, nome, tutores ( nome )`);
 
-    if(!error && data) {
-        cadastros = data;
-        data.forEach(p => {
-            const tutorNome = p.tutores ? p.tutores.nome : '';
-            const opt = `<option value="${p.id}">${p.nome} (${tutorNome})</option>`;
-            selCheckin.innerHTML += opt;
-            selPacote.innerHTML += opt;
-        });
+        if (!error && data) {
+            cadastros = data;
+            data.forEach(p => {
+                const tutorNome = p.tutores ? p.tutores.nome : '';
+                const opt = `<option value="${p.id}">${p.nome} (${tutorNome})</option>`;
+                selCheckin.innerHTML += opt;
+                selPacote.innerHTML += opt;
+            });
+        }
+    } catch (e) {
+        console.error('Erro ao popular selects:', e);
     }
 }
-
 
 // ALTERNAR VISIBILIDADE DO CAMPO DE VALOR E FORMA DE PAGAMENTO NO CHECK-IN
 function toggleValorAvulso() {
@@ -186,18 +214,18 @@ function toggleValorAvulso() {
     const groupPagto = document.getElementById('groupFormaPagamentoAvulso');
     
     if (tipo === 'avulso') {
-        groupValor.style.display = 'block';
-        groupPagto.style.display = 'block';
+        if (groupValor) groupValor.style.display = 'block';
+        if (groupPagto) groupPagto.style.display = 'block';
     } else {
-        groupValor.style.display = 'none';
-        groupPagto.style.display = 'none';
+        if (groupValor) groupValor.style.display = 'none';
+        if (groupPagto) groupPagto.style.display = 'none';
     }
 }
 
 // MODAIS
 function openModal(id) {
     populateSelects();
-    if(id === 'modalAtendimento') toggleValorAvulso();
+    if (id === 'modalAtendimento') toggleValorAvulso();
     document.getElementById(id).style.display = 'flex';
 }
 
@@ -205,7 +233,7 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// 4. SALVAR CADASTRO NO SUPABASE (TUTOR + PET)
+// 4. SALVAR CADASTRO NO SUPABASE
 async function salvarCadastro(e) {
     if (e) e.preventDefault();
 
@@ -221,27 +249,29 @@ async function salvarCadastro(e) {
     }
 
     try {
-        // 1. Inserir Tutor e retornar registro
-        const { data: tutorData, error: errTutor } = await _supabase
+        const client = getSupabase();
+
+        // 1. Inserir Tutor
+        const { data: tutorData, error: errTutor } = await client
             .from('tutores')
             .insert([{ nome: tutorNome, telefone: tutorFone }])
             .select('*');
 
         if (errTutor) {
             alert('Erro ao cadastrar Tutor: ' + errTutor.message);
-            console.error('Erro Supabase Tutor:', errTutor);
+            console.error(errTutor);
             return;
         }
 
         if (!tutorData || tutorData.length === 0) {
-            alert('Erro: O Supabase não retornou o ID do Tutor cadastrado. Verifique as permissões de SELECT da tabela "tutores".');
+            alert('Erro: Tutor gravado, mas ID não retornado pelo Supabase.');
             return;
         }
 
         const tutorId = tutorData[0].id;
 
-        // 2. Inserir Pet vinculado ao Tutor
-        const { error: errPet } = await _supabase
+        // 2. Inserir Pet
+        const { error: errPet } = await client
             .from('pets')
             .insert([{
                 tutor_id: tutorId,
@@ -252,7 +282,7 @@ async function salvarCadastro(e) {
 
         if (errPet) {
             alert('Erro ao cadastrar Pet: ' + errPet.message);
-            console.error('Erro Supabase Pet:', errPet);
+            console.error(errPet);
             return;
         }
 
@@ -262,92 +292,101 @@ async function salvarCadastro(e) {
 
     } catch (err) {
         alert('Ocorreu um erro inesperado: ' + err.message);
-        console.error('Erro Exceção:', err);
+        console.error(err);
     }
 }
 
 // 5. SALVAR CHECK-IN NO SUPABASE
 async function salvarCheckin() {
-    const petId = parseInt(document.getElementById('selectPetCheckin').value);
-    const tipo = document.getElementById('selectTipoCobranca').value;
-    const servico = document.getElementById('selectServico').value;
-    const valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) : 0;
+    try {
+        const client = getSupabase();
+        const petId = parseInt(document.getElementById('selectPetCheckin').value);
+        const tipo = document.getElementById('selectTipoCobranca').value;
+        const servico = document.getElementById('selectServico').value;
+        const valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) : 0;
 
-    if(tipo === 'pacote') {
-        const { data: pkgData } = await _supabase
-            .from('pacotes')
-            .select('*')
-            .eq('pet_id', petId)
-            .eq('status', 'ativo')
-            .single();
+        if (tipo === 'pacote') {
+            const { data: pkgData } = await client
+                .from('pacotes')
+                .select('*')
+                .eq('pet_id', petId)
+                .eq('status', 'ativo')
+                .single();
 
-        if(!pkgData || pkgData.quantidade_usada >= pkgData.quantidade_total) {
-            alert('Este pet não possui pacote ativo com saldo!');
-            return;
+            if (!pkgData || pkgData.quantidade_usada >= pkgData.quantidade_total) {
+                alert('Este pet não possui pacote ativo com saldo!');
+                return;
+            }
+
+            const novaQtd = pkgData.quantidade_usada + 1;
+            const statusNovo = novaQtd >= pkgData.quantidade_total ? 'finalizado' : 'ativo';
+
+            await client
+                .from('pacotes')
+                .update({ quantidade_usada: novaQtd, status: statusNovo })
+                .eq('id', pkgData.id);
+        } else {
+            const petObj = cadastros.find(p => p.id === petId);
+            const pagtoInput = document.getElementById('pagamentoAvulso');
+            await client
+                .from('caixa_lancamentos')
+                .insert([{
+                    descricao: `Atendimento Avulso - ${petObj ? petObj.nome : ''}`,
+                    forma_pagamento: pagtoInput ? pagtoInput.value : "PIX",
+                    valor: valor
+                }]);
         }
 
-        const novaQtd = pkgData.quantidade_usada + 1;
-        const statusNovo = novaQtd >= pkgData.quantidade_total ? 'finalizado' : 'ativo';
-
-        await _supabase
-            .from('pacotes')
-            .update({ quantidade_usada: novaQtd, status: statusNovo })
-            .eq('id', pkgData.id);
-    } else {
-        const petObj = cadastros.find(p => p.id === petId);
-        await _supabase
-            .from('caixa_lancamentos')
+        await client
+            .from('atendimentos')
             .insert([{
-                descricao: `Atendimento Avulso - ${petObj ? petObj.nome : ''}`,
-                forma_pagamento: document.getElementById('pagamentoAvulso').value || "PIX",
+                pet_id: petId,
+                servico: servico,
+                tipo: tipo,
+                status: 'em_andamento',
                 valor: valor
             }]);
+
+        closeModal('modalAtendimento');
+        carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro ao salvar check-in: ' + e.message);
     }
-
-    await _supabase
-        .from('atendimentos')
-        .insert([{
-            pet_id: petId,
-            servico: servico,
-            tipo: tipo,
-            status: 'em_andamento',
-            valor: valor
-        }]);
-
-    closeModal('modalAtendimento');
-    carregarDadosAtendimentos();
 }
 
 // 6. SALVAR VENDA DE PACOTE NO SUPABASE
 async function salvarVendaPacote() {
-    const petId = parseInt(document.getElementById('selectPetPacote').value);
-    const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
-    const valor = parseFloat(document.getElementById('valorPacote').value);
-    const forma = document.getElementById('pagamentoPacote').value;
-    const petObj = cadastros.find(p => p.id === petId);
+    try {
+        const client = getSupabase();
+        const petId = parseInt(document.getElementById('selectPetPacote').value);
+        const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
+        const valor = parseFloat(document.getElementById('valorPacote').value);
+        const forma = document.getElementById('pagamentoPacote').value;
+        const petObj = cadastros.find(p => p.id === petId);
 
-    // Criar Pacote
-    await _supabase
-        .from('pacotes')
-        .insert([{
-            pet_id: petId,
-            quantidade_total: qtd,
-            quantidade_usada: 0,
-            status: 'ativo'
-        }]);
+        await client
+            .from('pacotes')
+            .insert([{
+                pet_id: petId,
+                quantidade_total: qtd,
+                quantidade_usada: 0,
+                status: 'ativo'
+            }]);
 
-    // Lançar no Caixa
-    await _supabase
-        .from('caixa_lancamentos')
-        .insert([{
-            descricao: `Venda Pacote (${qtd} Banhos) - ${petObj ? petObj.nome : ''}`,
-            forma_pagamento: forma,
-            valor: valor
-        }]);
+        await client
+            .from('caixa_lancamentos')
+            .insert([{
+                descricao: `Venda Pacote (${qtd} Banhos) - ${petObj ? petObj.nome : ''}`,
+                forma_pagamento: forma,
+                valor: valor
+            }]);
 
-    closeModal('modalPacote');
-    alert('Pacote cadastrado e lançado no caixa!');
-    carregarDadosAtendimentos();
+        closeModal('modalPacote');
+        alert('Pacote cadastrado e lançado no caixa!');
+        carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro ao vender pacote: ' + e.message);
+    }
 }
 
 function filterServices(tipo, btn) {
@@ -356,5 +395,7 @@ function filterServices(tipo, btn) {
     renderAtendimentos(tipo);
 }
 
-// INICIALIZAÇÃO
-carregarDadosAtendimentos();
+// INICIALIZAÇÃO SEGURA APÓS O CARREGAMENTO DO DOM
+window.addEventListener('DOMContentLoaded', () => {
+    carregarDadosAtendimentos();
+});
