@@ -4,16 +4,15 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 var _supabase = null;
 
-// Função para garantir a inicialização da conexão antes de usar
 function getSupabase() {
     if (!_supabase) {
-        if (typeof supabase !== 'undefined' && supabase.createClient) {
-            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        } else if (window.supabase && window.supabase.createClient) {
-            _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const globalSupabase = window.supabase || typeof supabase !== 'undefined' ? supabase : null;
+        
+        if (globalSupabase && typeof globalSupabase.createClient === 'function') {
+            _supabase = globalSupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         } else {
-            alert('A biblioteca do Supabase não foi carregada. Verifique se o script CDN está no <head> do index.html.');
-            throw new Error('Supabase SDK não carregado');
+            console.error('SDK do Supabase ainda não carregou totalmente.');
+            return null;
         }
     }
     return _supabase;
