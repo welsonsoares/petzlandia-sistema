@@ -28,6 +28,14 @@ header {
     display: flex; align-items: center; justify-content: center;
     color: var(--purple-main); font-size: 18px; border: 2px solid var(--yellow-main);
 }
+/* Estilização da Logo Oficial no Cabeçalho */
+.brand-logo-img {
+    height: 48px; /* Altura ideal para o cabeçalho */
+    width: auto;  /* Mantém a proporção do coração com os pets */
+    object-fit: contain;
+    display: block;
+}
+
 .brand-title { font-size: 18px; font-weight: 700; }
 .brand-title span { color: var(--yellow-main); }
 .user-nav { display: flex; align-items: center; gap: 16px; }
