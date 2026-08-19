@@ -199,46 +199,65 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// 4. SALVAR CADASTRO NO SUPABASE
+// 4. SALVAR CADASTRO NO SUPABASE (TUTOR + PET)
 async function salvarCadastro(e) {
-    e.preventDefault();
-    const tutorNome = document.getElementById('cadTutorNome').value;
-    const tutorFone = document.getElementById('cadTutorFone').value;
-    const petNome = document.getElementById('cadPetNome').value;
-    const petRaca = document.getElementById('cadPetRaca').value;
-    const petObs = document.getElementById('cadPetObs').value;
+    if (e) e.preventDefault();
 
-    // Inserir Tutor
-    const { data: tutorData, error: errTutor } = await _supabase
-        .from('tutores')
-        .insert([{ nome: tutorNome, telefone: tutorFone }])
-        .select();
+    const tutorNome = document.getElementById('cadTutorNome').value.trim();
+    const tutorFone = document.getElementById('cadTutorFone').value.trim();
+    const petNome = document.getElementById('cadPetNome').value.trim();
+    const petRaca = document.getElementById('cadPetRaca').value.trim();
+    const petObs = document.getElementById('cadPetObs').value.trim();
 
-    if (errTutor) { 
-        alert('Erro ao cadastrar tutor: ' + errTutor.message); 
-        console.error(errTutor);
-        return; 
+    if (!tutorNome || !tutorFone || !petNome || !petRaca) {
+        alert('Por favor, preencha todos os campos obrigatórios (*).');
+        return;
     }
 
-    // Inserir Pet
-    const { error: errPet } = await _supabase
-        .from('pets')
-        .insert([{
-            tutor_id: tutorData[0].id,
-            nome: petNome,
-            raca_porte: petRaca,
-            observacoes: petObs
-        }]);
+    try {
+        // 1. Inserir Tutor e retornar registro
+        const { data: tutorData, error: errTutor } = await _supabase
+            .from('tutores')
+            .insert([{ nome: tutorNome, telefone: tutorFone }])
+            .select('*');
 
-    if (errPet) { 
-        alert('Erro ao cadastrar pet: ' + errPet.message); 
-        console.error(errPet);
-        return; 
+        if (errTutor) {
+            alert('Erro ao cadastrar Tutor: ' + errTutor.message);
+            console.error('Erro Supabase Tutor:', errTutor);
+            return;
+        }
+
+        if (!tutorData || tutorData.length === 0) {
+            alert('Erro: O Supabase não retornou o ID do Tutor cadastrado. Verifique as permissões de SELECT da tabela "tutores".');
+            return;
+        }
+
+        const tutorId = tutorData[0].id;
+
+        // 2. Inserir Pet vinculado ao Tutor
+        const { error: errPet } = await _supabase
+            .from('pets')
+            .insert([{
+                tutor_id: tutorId,
+                nome: petNome,
+                raca_porte: petRaca,
+                observacoes: petObs
+            }]);
+
+        if (errPet) {
+            alert('Erro ao cadastrar Pet: ' + errPet.message);
+            console.error('Erro Supabase Pet:', errPet);
+            return;
+        }
+
+        alert('Tutor e Pet cadastrados com sucesso!');
+        document.getElementById('formCadastro').reset();
+        switchTab('atendimentos');
+
+    } catch (err) {
+        alert('Ocorreu um erro inesperado: ' + err.message);
+        console.error('Erro Exceção:', err);
     }
-
-    alert('Tutor e Pet cadastrados no banco com sucesso!');
-    document.getElementById('formCadastro').reset();
-    switchTab('atendimentos');
 }
 
 // 5. SALVAR CHECK-IN NO SUPABASE
