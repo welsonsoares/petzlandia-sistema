@@ -18,7 +18,7 @@
 body { background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; }
 
 header {
-    background-color: var(--purple-main); color: #fff; padding: 12px 24px;
+    background-color: var(--purple-main); color: #fff; padding: 8px 24px;
     display: flex; align-items: center; justify-content: space-between;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
@@ -30,10 +30,12 @@ header {
 }
 /* Estilização da Logo Oficial no Cabeçalho */
 .brand-logo-img {
-    height: 48px; /* Altura ideal para o cabeçalho */
+    height: 70px; /* Altura ideal para o cabeçalho */
+    max-height: 80px;     /* Limite de altura para telas pequenas */
     width: auto;  /* Mantém a proporção do coração com os pets */
     object-fit: contain;
     display: block;
+    margin: -6px 0;       /* Ajusta o alinhamento sem achatar o cabeçalho */
 }
 
 .brand-title { font-size: 18px; font-weight: 700; }
