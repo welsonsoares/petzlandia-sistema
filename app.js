@@ -197,7 +197,11 @@ async function salvarCadastro(e) {
         .insert([{ nome: tutorNome, telefone: tutorFone }])
         .select();
 
-    if(errTutor) { alert('Erro ao cadastrar tutor'); return; }
+    if (errTutor) { 
+        alert('Erro ao cadastrar tutor: ' + errTutor.message); 
+        console.error(errTutor);
+        return; 
+    }
 
     // Inserir Pet
     const { error: errPet } = await _supabase
@@ -209,7 +213,11 @@ async function salvarCadastro(e) {
             observacoes: petObs
         }]);
 
-    if(errPet) { alert('Erro ao cadastrar pet'); return; }
+    if (errPet) { 
+        alert('Erro ao cadastrar pet: ' + errPet.message); 
+        console.error(errPet);
+        return; 
+    }
 
     alert('Tutor e Pet cadastrados no banco com sucesso!');
     document.getElementById('formCadastro').reset();
