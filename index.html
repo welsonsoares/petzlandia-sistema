@@ -136,7 +136,7 @@
             </div>
             <div class="form-group">
                 <label>Tipo de Cobrança</label>
-                <select class="form-control" id="selectTipoCobranca">
+                <select class="form-control" id="selectTipoCobranca" onchange="toggleValorAvulso()">
                     <option value="pacote">Debitar do Pacote Ativo</option>
                     <option value="avulso">Atendimento Avulso</option>
                 </select>
@@ -149,9 +149,17 @@
                     <option value="Tosa Higiênica">Tosa Higiênica</option>
                 </select>
             </div>
-            <div class="form-group" id="groupValorAvulso">
+            <div class="form-group" id="groupValorAvulso" style="display:none;">
                 <label>Valor do Serviço (R$)</label>
                 <input type="number" id="valorAvulso" class="form-control" value="70">
+            </div>
+            <div class="form-group" id="groupFormaPagamentoAvulso" style="display:none;">
+                <label>Forma de Pagamento</label>
+                <select class="form-control" id="pagamentoAvulso">
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão de Crédito/Débito</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                </select>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalAtendimento')">Cancelar</button>
