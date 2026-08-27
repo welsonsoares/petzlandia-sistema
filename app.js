@@ -527,6 +527,119 @@ function filterServices(tipo, btn) {
     renderAtendimentos(tipo);
 }
 
+// INICIALIZAÇÃO ÚNICA DO SISTEMA
 window.addEventListener('DOMContentLoaded', () => {
     carregarDadosAtendimentos();
+    checarStatusCaixa();
 });
+
+let caixaAtualSessao = null;
+
+// VERIFICAR STATUS DO CAIXA
+async function checarStatusCaixa() {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('caixa_sessoes')
+            .select('*')
+            .eq('status', 'aberto')
+            .order('data_abertura', { ascending: false })
+            .limit(1);
+
+        const btnAbrir = document.getElementById('btnAbrirCaixa');
+        const btnFechar = document.getElementById('btnFecharCaixa');
+
+        if (!error && data && data.length > 0) {
+            caixaAtualSessao = data[0];
+            if (btnAbrir) btnAbrir.style.display = 'none';
+            if (btnFechar) btnFechar.style.display = 'inline-block';
+        } else {
+            caixaAtualSessao = null;
+            if (btnAbrir) btnAbrir.style.display = 'inline-block';
+            if (btnFechar) btnFechar.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Erro ao checar caixa:', e);
+    }
+}
+
+// CONFIRMAR ABERTURA DE CAIXA
+async function confirmarAberturaCaixa() {
+    try {
+        const client = getSupabase();
+        const valorFundo = parseFloat(document.getElementById('valorFundoInicial').value) || 0;
+
+        const { error } = await client
+            .from('caixa_sessoes')
+            .insert([{
+                valor_inicial: valorFundo,
+                status: 'aberto'
+            }]);
+
+        if (error) {
+            alert('Erro ao abrir caixa: ' + error.message);
+            return;
+        }
+
+        closeModal('modalAbrirCaixa');
+        alert('Caixa aberto com sucesso!');
+        await checarStatusCaixa();
+    } catch (e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+// CONFIRMAR FECHAMENTO CEGO DE CAIXA
+async function confirmarFechamentoCaixa() {
+    try {
+        if (!caixaAtualSessao) {
+            alert('Nenhum caixa aberto no momento.');
+            return;
+        }
+
+        const client = getSupabase();
+        const informado = parseFloat(document.getElementById('valorGavetaInformado').value) || 0;
+
+        // Calcular total em dinheiro registrado nas vendas
+        let totalDinheiroVendas = 0;
+        caixaLancamentos.forEach(c => {
+            if ((c.forma_pagamento || '').toLowerCase() === 'dinheiro') {
+                totalDinheiroVendas += parseFloat(c.valor || 0);
+            }
+        });
+
+        const esperado = parseFloat(caixaAtualSessao.valor_inicial) + totalDinheiroVendas;
+        const diferenca = informado - esperado;
+
+        const { error } = await client
+            .from('caixa_sessoes')
+            .update({
+                data_fechamento: new Date().toISOString(),
+                valor_final_informado: informado,
+                valor_esperado: esperado,
+                diferenca: diferenca,
+                status: 'fechado'
+            })
+            .eq('id', caixaAtualSessao.id);
+
+        if (error) {
+            alert('Erro ao fechar caixa: ' + error.message);
+            return;
+        }
+
+        closeModal('modalFecharCaixa');
+
+        let msgResumo = `Caixa Encerrado com Sucesso!\n\n`;
+        msgResumo += `• Fundo Inicial: R$ ${parseFloat(caixaAtualSessao.valor_inicial).toFixed(2)}\n`;
+        msgResumo += `• Esperado em Dinheiro: R$ ${esperado.toFixed(2)}\n`;
+        msgResumo += `• Informado na Gaveta: R$ ${informado.toFixed(2)}\n`;
+        msgResumo += `• Diferença: R$ ${diferenca.toFixed(2)}`;
+
+        alert(msgResumo);
+        await checarStatusCaixa();
+    } catch (e) {
+        alert('Erro ao encerrar caixa: ' + e.message);
+    }
+}
