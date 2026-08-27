@@ -23,18 +23,24 @@ let pacotes = [];
 let atendimentos = [];
 let caixaLancamentos = [];
 
-function switchTab(tabId) {
+function switchTab(tabId, btnElement = null) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
 
-    document.getElementById(`sec-${tabId}`).classList.add('active');
-    if (event && event.currentTarget) event.currentTarget.classList.add('active');
+    const secTarget = document.getElementById(`sec-${tabId}`);
+    if (secTarget) secTarget.classList.add('active');
+
+    if (btnElement) {
+        btnElement.classList.add('active');
+    } else {
+        const defaultBtn = document.querySelector(`.nav-btn[onclick*="${tabId}"]`);
+        if (defaultBtn) defaultBtn.classList.add('active');
+    }
 
     if (tabId === 'atendimentos') carregarDadosAtendimentos();
     if (tabId === 'caixa') carregarCaixa();
 }
 
-// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
@@ -67,7 +73,6 @@ async function carregarDadosAtendimentos() {
     }
 }
 
-// 2. RENDERIZAR PAINEL DE PETS PRESENTES (RF05, RF06, RF10)
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
@@ -134,7 +139,6 @@ function renderAtendimentos(filter = 'todos') {
     });
 }
 
-// 3. ALTERAR STATUS DE ATENDIMENTO
 async function alterarStatusAtendimento(id, novoStatus) {
     try {
         const client = getSupabase();
@@ -160,7 +164,6 @@ async function alterarStatusAtendimento(id, novoStatus) {
     }
 }
 
-// 4. NOTIFICAÇÃO VIA WHATSAPP (RF10)
 function notificarWhatsapp(tutorNome, fone, petNome) {
     if (!fone) {
         alert('Telefone do tutor não cadastrado.');
@@ -359,7 +362,6 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN NO SUPABASE
 async function salvarCheckin() {
     try {
         const client = getSupabase();
@@ -419,7 +421,6 @@ async function salvarCheckin() {
     }
 }
 
-// 6. SALVAR VENDA DE PACOTE NO SUPABASE
 async function salvarVendaPacote() {
     try {
         const client = getSupabase();
