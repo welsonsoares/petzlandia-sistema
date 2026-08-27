@@ -34,6 +34,7 @@ function switchTab(tabId) {
     if (tabId === 'caixa') carregarCaixa();
 }
 
+// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
@@ -66,6 +67,7 @@ async function carregarDadosAtendimentos() {
     }
 }
 
+// 2. RENDERIZAR PAINEL DE PETS PRESENTES (RF05, RF06, RF10)
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
@@ -79,7 +81,7 @@ function renderAtendimentos(filter = 'todos') {
     }
 
     if (filtered.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento encontrado neste filtro.</p>`;
+        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento presente no momento.</p>`;
         return;
     }
 
@@ -132,6 +134,7 @@ function renderAtendimentos(filter = 'todos') {
     });
 }
 
+// 3. ALTERAR STATUS DE ATENDIMENTO
 async function alterarStatusAtendimento(id, novoStatus) {
     try {
         const client = getSupabase();
@@ -157,6 +160,7 @@ async function alterarStatusAtendimento(id, novoStatus) {
     }
 }
 
+// 4. NOTIFICAÇÃO VIA WHATSAPP (RF10)
 function notificarWhatsapp(tutorNome, fone, petNome) {
     if (!fone) {
         alert('Telefone do tutor não cadastrado.');
@@ -355,6 +359,7 @@ async function salvarCadastro(e) {
     }
 }
 
+// 5. SALVAR CHECK-IN NO SUPABASE
 async function salvarCheckin() {
     try {
         const client = getSupabase();
@@ -414,6 +419,7 @@ async function salvarCheckin() {
     }
 }
 
+// 6. SALVAR VENDA DE PACOTE NO SUPABASE
 async function salvarVendaPacote() {
     try {
         const client = getSupabase();

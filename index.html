@@ -28,11 +28,11 @@
 
     <!-- Navegação Principal -->
     <nav class="main-nav">
-        <button class="nav-btn active" onclick="switchTab('atendimentos')"><i class="fa-solid fa-paw"></i> Atendimentos
-            & Pets</button>
-        <button class="nav-btn" onclick="switchTab('cadastros')"><i class="fa-solid fa-address-book"></i> Cadastros
-            (Tutor/Pet)</button>
-        <button class="nav-btn" onclick="switchTab('caixa')"><i class="fa-solid fa-cash-register"></i> Caixa
+        <button class="nav-btn active" onclick="switchTab('atendimentos', this)"><i class="fa-solid fa-paw"></i>
+            Atendimentos & Pets</button>
+        <button class="nav-btn" onclick="switchTab('cadastros', this)"><i class="fa-solid fa-address-book"></i>
+            Cadastros (Tutor/Pet)</button>
+        <button class="nav-btn" onclick="switchTab('caixa', this)"><i class="fa-solid fa-cash-register"></i> Caixa
             Diário</button>
     </nav>
 
@@ -40,20 +40,35 @@
     <div class="container">
 
         <!-- SEÇÃO 1: ATENDIMENTOS E PACOTES -->
-        <!-- PAINEL DE PETS PRESENTES HOJE -->
-        <div class="panel">
-            <div class="panel-header">
-                <div class="panel-title"><i class="fa-solid fa-list-check"></i> Pets na Loja Hoje</div>
-                <button class="btn btn-yellow" onclick="openModal('modalAtendimento')"><i class="fa-solid fa-plus"></i>
-                    Novo Check-in</button>
+        <section id="sec-atendimentos" class="tab-content active">
+            <div class="grid-2col">
+                <!-- PAINEL DE PETS PRESENTES HOJE -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-list-check"></i> Pets na Loja Hoje</div>
+                        <button class="btn btn-yellow" onclick="openModal('modalAtendimento')"><i
+                                class="fa-solid fa-plus"></i> Novo Check-in</button>
+                    </div>
+                    <div class="filter-tabs">
+                        <button class="filter-btn active" onclick="filterServices('todos', this)">Todos</button>
+                        <button class="filter-btn" onclick="filterServices('em_andamento', this)">Em
+                            Atendimento</button>
+                        <button class="filter-btn" onclick="filterServices('pronto', this)">Prontos</button>
+                    </div>
+                    <div class="service-list" id="serviceList"></div>
+                </div>
+
+                <!-- PAINEL DE PACOTES ATIVOS -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-box-open"></i> Pacotes Ativos</div>
+                        <button class="btn btn-purple btn-sm" onclick="openModal('modalPacote')"><i
+                                class="fa-solid fa-cart-shopping"></i> Vender Pacote</button>
+                    </div>
+                    <div id="packageList"></div>
+                </div>
             </div>
-            <div class="filter-tabs">
-                <button class="filter-btn active" onclick="filterServices('todos', this)">Todos</button>
-                <button class="filter-btn" onclick="filterServices('em_andamento', this)">Em Atendimento</button>
-                <button class="filter-btn" onclick="filterServices('pronto', this)">Prontos</button>
-            </div>
-            <div class="service-list" id="serviceList"></div>
-        </div>
+        </section>
 
         <!-- SEÇÃO 2: CADASTROS (TUTOR E PET) -->
         <section id="sec-cadastros" class="tab-content">
