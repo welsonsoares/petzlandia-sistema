@@ -6,25 +6,23 @@ var _supabase = null;
 
 function getSupabase() {
     if (!_supabase) {
-        const globalSupabase = window.supabase || typeof supabase !== 'undefined' ? supabase : null;
-
-        if (globalSupabase && typeof globalSupabase.createClient === 'function') {
-            _supabase = globalSupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        if (typeof supabase !== 'undefined' && supabase.createClient) {
+            _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        } else if (window.supabase && window.supabase.createClient) {
+            _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         } else {
-            console.error('SDK do Supabase ainda não carregou totalmente.');
+            console.error('Supabase SDK não carregado');
             return null;
         }
     }
     return _supabase;
 }
 
-// Cache local temporário após busca do banco
 let cadastros = [];
 let pacotes = [];
 let atendimentos = [];
 let caixaLancamentos = [];
 
-// NAVEGAÇÃO ENTRE ABAS
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
@@ -36,23 +34,21 @@ function switchTab(tabId) {
     if (tabId === 'caixa') carregarCaixa();
 }
 
-// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
+        if (!client) return;
 
-        // Buscar Atendimentos de Hoje
         const { data: dataAtend, error: errAtend } = await client
             .from('atendimentos')
             .select(`
                 id, servico, tipo, status, valor, data_entrada,
-                pets ( nome, tutores ( nome ) )
+                pets ( nome, tutores ( nome, telefone ) )
             `)
             .order('data_entrada', { ascending: false });
 
         if (!errAtend) atendimentos = dataAtend || [];
 
-        // Buscar Pacotes Ativos
         const { data: dataPkg, error: errPkg } = await client
             .from('pacotes')
             .select(`
@@ -75,10 +71,15 @@ function renderAtendimentos(filter = 'todos') {
     if (!list) return;
     list.innerHTML = '';
 
-    const filtered = filter === 'todos' ? atendimentos : atendimentos.filter(a => a.tipo === filter);
+    let filtered = [];
+    if (filter === 'todos') {
+        filtered = atendimentos.filter(a => a.status !== 'finalizado');
+    } else {
+        filtered = atendimentos.filter(a => a.status === filter);
+    }
 
     if (filtered.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento registrado.</p>`;
+        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento encontrado neste filtro.</p>`;
         return;
     }
 
@@ -86,23 +87,84 @@ function renderAtendimentos(filter = 'todos') {
         const isPkg = item.tipo === 'pacote';
         const petNome = item.pets ? item.pets.nome : 'Pet';
         const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
+        const tutorFone = (item.pets && item.pets.tutores) ? item.pets.tutores.telefone : '';
         const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
+        const isPronto = item.status === 'pronto';
 
         list.innerHTML += `
-            <div class="service-item">
-                <div class="pet-info">
-                    <div class="pet-icon"><i class="fa-solid fa-dog"></i></div>
+            <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="pet-info">
+                        <div class="pet-icon" style="background:${isPronto ? '#e8f5e9' : '#f0eaf4'}; color:${isPronto ? '#2e7d32' : 'var(--purple-main)'};">
+                            <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
+                        </div>
+                        <div>
+                            <strong>${petNome}</strong> <small>(${tutorNome})</small>
+                            <p style="font-size:11px; color:#666;">${item.servico} • Entrou às ${hora}</p>
+                        </div>
+                    </div>
                     <div>
-                        <strong>${petNome}</strong> <small>(${tutorNome})</small>
-                        <p style="font-size:11px; color:#666;">${item.servico} • ${hora}</p>
+                        <span class="badge ${isPronto ? 'badge-avulso' : 'badge-pacote'}" style="margin-right:5px;">
+                            ${isPronto ? 'Pronto para Busca' : 'Em Atendimento'}
+                        </span>
+                        <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
+                            ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
+                        </span>
                     </div>
                 </div>
-                <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
-                    ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
-                </span>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #f0eaf4; padding-top:8px;">
+                    ${!isPronto ? `
+                        <button class="btn btn-sm btn-yellow" onclick="alterarStatusAtendimento(${item.id}, 'pronto')">
+                            <i class="fa-solid fa-check"></i> Marcar como Pronto
+                        </button>
+                    ` : `
+                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${tutorNome}', '${tutorFone}', '${petNome}')">
+                            <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
+                        </button>
+                        <button class="btn btn-sm btn-purple" onclick="alterarStatusAtendimento(${item.id}, 'finalizado')">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
+                        </button>
+                    `}
+                </div>
             </div>
         `;
     });
+}
+
+async function alterarStatusAtendimento(id, novoStatus) {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client
+            .from('atendimentos')
+            .update({ status: novoStatus })
+            .eq('id', id);
+
+        if (error) {
+            alert('Erro ao atualizar status: ' + error.message);
+            return;
+        }
+
+        if (novoStatus === 'finalizado') {
+            alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
+        }
+
+        carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro ao alterar status: ' + e.message);
+    }
+}
+
+function notificarWhatsapp(tutorNome, fone, petNome) {
+    if (!fone) {
+        alert('Telefone do tutor não cadastrado.');
+        return;
+    }
+    const numLimpo = fone.replace(/\D/g, '');
+    const msg = encodeURIComponent(`Olá ${tutorNome}! O pet ${petNome} já finalizou o serviço na Petz Lândia e está pronto para ser buscado! 🐾`);
+    window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
 }
 
 function renderPacotes() {
@@ -134,10 +196,11 @@ function renderPacotes() {
     });
 }
 
-// 2. CARREGAR CAIXA DO SUPABASE
 async function carregarCaixa() {
     try {
         const client = getSupabase();
+        if (!client) return;
+
         const { data, error } = await client
             .from('caixa_lancamentos')
             .select('*')
@@ -179,7 +242,6 @@ function renderCaixa() {
     document.getElementById('caixaOutros').innerText = `R$ ${outros.toFixed(2)}`;
 }
 
-// 3. POPULAR SELECTS NOS MODAIS
 async function populateSelects() {
     const selCheckin = document.getElementById('selectPetCheckin');
     const selPacote = document.getElementById('selectPetPacote');
@@ -188,6 +250,8 @@ async function populateSelects() {
 
     try {
         const client = getSupabase();
+        if (!client) return;
+
         const { data, error } = await client
             .from('pets')
             .select(`id, nome, tutores ( nome )`);
@@ -206,7 +270,6 @@ async function populateSelects() {
     }
 }
 
-// ALTERNAR VISIBILIDADE DO CAMPO DE VALOR E FORMA DE PAGAMENTO NO CHECK-IN
 function toggleValorAvulso() {
     const tipo = document.getElementById('selectTipoCobranca').value;
     const groupValor = document.getElementById('groupValorAvulso');
@@ -221,7 +284,6 @@ function toggleValorAvulso() {
     }
 }
 
-// MODAIS
 function openModal(id) {
     populateSelects();
     if (id === 'modalAtendimento') toggleValorAvulso();
@@ -232,7 +294,6 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// 4. SALVAR CADASTRO NO SUPABASE
 async function salvarCadastro(e) {
     if (e) e.preventDefault();
 
@@ -249,8 +310,8 @@ async function salvarCadastro(e) {
 
     try {
         const client = getSupabase();
+        if (!client) return;
 
-        // 1. Inserir Tutor
         const { data: tutorData, error: errTutor } = await client
             .from('tutores')
             .insert([{ nome: tutorNome, telefone: tutorFone }])
@@ -269,7 +330,6 @@ async function salvarCadastro(e) {
 
         const tutorId = tutorData[0].id;
 
-        // 2. Inserir Pet
         const { error: errPet } = await client
             .from('pets')
             .insert([{
@@ -295,10 +355,11 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN NO SUPABASE
 async function salvarCheckin() {
     try {
         const client = getSupabase();
+        if (!client) return;
+
         const petId = parseInt(document.getElementById('selectPetCheckin').value);
         const tipo = document.getElementById('selectTipoCobranca').value;
         const servico = document.getElementById('selectServico').value;
@@ -353,63 +414,21 @@ async function salvarCheckin() {
     }
 }
 
-// 6. SALVAR VENDA DE PACOTE NO SUPABASE
 async function salvarVendaPacote() {
     try {
         const client = getSupabase();
+        if (!client) return;
+
         const petId = parseInt(document.getElementById('selectPetPacote').value);
         const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
         const valor = parseFloat(document.getElementById('valorPacote').value);
         const forma = document.getElementById('pagamentoPacote').value;
         const petObj = cadastros.find(p => p.id === petId);
 
-        await client
-            .from('pacotes')
-            .insert([{
-                pet_id: petId,
-                quantidade_total: qtd,
-                quantidade_usada: 0,
-                status: 'ativo'
-            }]);
-
-        await client
-            .from('caixa_lancamentos')
-            .insert([{
-                descricao: `Venda Pacote (${qtd} Banhos) - ${petObj ? petObj.nome : ''}`,
-                forma_pagamento: forma,
-                valor: valor
-            }]);
-
-        closeModal('modalPacote');
-        alert('Pacote cadastrado e lançado no caixa!');
-        carregarDadosAtendimentos();
-    } catch (e) {
-        alert('Erro ao vender pacote: ' + e.message);
-    }
-}
-
-function filterServices(tipo, btn) {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderAtendimentos(tipo);
-}
-
-// Atualização na função salvarVendaPacote() no app.js
-async function salvarVendaPacote() {
-    try {
-        const client = getSupabase();
-        const petId = parseInt(document.getElementById('selectPetPacote').value);
-        const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
-        const valor = parseFloat(document.getElementById('valorPacote').value);
-        const forma = document.getElementById('pagamentoPacote').value;
-        const petObj = cadastros.find(p => p.id === petId);
-
-        // Calcular data de validade (30 dias a partir de hoje)
         const dataHoje = new Date();
         dataHoje.setDate(dataHoje.getDate() + 30);
         const dataValidade = dataHoje.toISOString().split('T')[0];
 
-        // Criar Pacote com data_validade
         await client
             .from('pacotes')
             .insert([{
@@ -436,106 +455,12 @@ async function salvarVendaPacote() {
     }
 }
 
-// RENDERIZAR PAINEL DE PETS PRESENTES (RF05)
-function renderAtendimentos(filter = 'todos') {
-    const list = document.getElementById('serviceList');
-    if (!list) return;
-    list.innerHTML = '';
-
-    const filtered = filter === 'todos'
-        ? atendimentos.filter(a => a.status !== 'finalizado')
-        : atendimentos.filter(a => a.status === filter);
-
-    if (filtered.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum pet presente no momento.</p>`;
-        return;
-    }
-
-    filtered.forEach(item => {
-        const isPkg = item.tipo === 'pacote';
-        const petNome = item.pets ? item.pets.nome : 'Pet';
-        const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
-        const tutorFone = (item.pets && item.pets.tutores) ? item.pets.tutores.telefone : '';
-        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
-        const isPronto = item.status === 'pronto';
-
-        list.innerHTML += `
-            <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div class="pet-info">
-                        <div class="pet-icon" style="background:${isPronto ? '#e8f5e9' : '#f0eaf4'}; color:${isPronto ? '#2e7d32' : 'var(--purple-main)'};">
-                            <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
-                        </div>
-                        <div>
-                            <strong>${petNome}</strong> <small>(${tutorNome})</small>
-                            <p style="font-size:11px; color:#666;">${item.servico} • Entrou às ${hora}</p>
-                        </div>
-                    </div>
-                    <div>
-                        <span class="badge ${isPronto ? 'badge-avulso' : 'badge-pacote'}" style="margin-right:5px;">
-                            ${isPronto ? 'Pronto para Busca' : 'Em Atendimento'}
-                        </span>
-                        <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
-                            ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
-                        </span>
-                    </div>
-                </div>
-
-                <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #f0eaf4; padding-top:8px;">
-                    ${!isPronto ? `
-                        <button class="btn btn-sm btn-yellow" onclick="alterarStatusAtendimento(${item.id}, 'pronto')">
-                            <i class="fa-solid fa-check"></i> Marcar como Pronto
-                        </button>
-                    ` : `
-                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${tutorNome}', '${tutorFone}', '${petNome}')">
-                            <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
-                        </button>
-                        <button class="btn btn-sm btn-purple" onclick="alterarStatusAtendimento(${item.id}, 'finalizado')">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
-                        </button>
-                    `}
-                </div>
-            </div>
-        `;
-    });
+function filterServices(tipo, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAtendimentos(tipo);
 }
 
-// MUDAR STATUS DO ATENDIMENTO (RF05 & RF06)
-async function alterarStatusAtendimento(id, novoStatus) {
-    try {
-        const client = getSupabase();
-        const { error } = await client
-            .from('atendimentos')
-            .update({ status: novoStatus })
-            .eq('id', id);
-
-        if (error) {
-            alert('Erro ao atualizar status: ' + error.message);
-            return;
-        }
-
-        if (novoStatus === 'finalizado') {
-            alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
-        }
-
-        carregarDadosAtendimentos();
-    } catch (e) {
-        alert('Erro ao alterar status: ' + e.message);
-    }
-}
-
-// NOTIFICAÇÃO VIA WHATSAPP (RF10)
-function notificarWhatsapp(tutorNome, fone, petNome) {
-    if (!fone) {
-        alert('Telefone do tutor não cadastrado.');
-        return;
-    }
-    const numLimpo = fone.replace(/\D/g, '');
-    const msg = encodeURIComponent(`Olá ${tutorNome}! O pet ${petNome} já finalizou o serviço na Petz Lândia e está pronto para ser buscado! 🐾`);
-    window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
-}
-
-// INICIALIZAÇÃO SEGURA APÓS O CARREGAMENTO DO DOM
 window.addEventListener('DOMContentLoaded', () => {
     carregarDadosAtendimentos();
 });
