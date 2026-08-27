@@ -41,26 +41,33 @@ function switchTab(tabId, btnElement = null) {
     if (tabId === 'caixa') carregarCaixa();
 }
 
-// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
+// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE (CORRIGIDO)
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
         if (!client) return;
 
+        // Primeiro garante que a lista de pets/tutores está atualizada na memória
+        await populateSelects();
+
         const { data: dataAtend, error: errAtend } = await client
             .from('atendimentos')
             .select(`
-                id, servico, tipo, status, valor, data_entrada,
+                id, pet_id, servico, tipo, status, valor, data_entrada,
                 pets ( id, nome, tutores ( nome, telefone ) )
             `)
             .order('data_entrada', { ascending: false });
 
-        if (!errAtend) atendimentos = dataAtend || [];
+        if (errAtend) {
+            console.error('Erro na busca de atendimentos:', errAtend);
+        } else {
+            atendimentos = dataAtend || [];
+        }
 
         const { data: dataPkg, error: errPkg } = await client
             .from('pacotes')
             .select(`
-                id, quantidade_total, quantidade_usada, status,
+                id, pet_id, quantidade_total, quantidade_usada, status,
                 pets ( nome, tutores ( nome ) )
             `)
             .eq('status', 'ativo');
@@ -74,7 +81,7 @@ async function carregarDadosAtendimentos() {
     }
 }
 
-// 2. RENDERIZAR PAINEL DE PETS PRESENTES
+// 2. RENDERIZAR PAINEL DE PETS PRESENTES (COM FALLBACK DE SEGURANÇA)
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
@@ -97,9 +104,27 @@ function renderAtendimentos(filter = 'todos') {
 
     filtered.forEach(item => {
         const isPkg = item.tipo === 'pacote';
-        const petNome = item.pets ? item.pets.nome : 'Pet';
-        const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
-        const tutorFone = (item.pets && item.pets.tutores) ? item.pets.tutores.telefone : '';
+
+        // Buscando dados do Pet/Tutor diretamente do Supabase ou com fallback do cadastro local
+        let petNome = 'Pet';
+        let tutorNome = 'Tutor';
+        let tutorFone = '';
+
+        if (item.pets) {
+            petNome = item.pets.nome || 'Pet';
+            if (item.pets.tutores) {
+                tutorNome = item.pets.tutores.nome || 'Tutor';
+                tutorFone = item.pets.tutores.telefone || '';
+            }
+        } else {
+            // Fallback caso o JOIN do Supabase retorne nulo
+            const localPet = cadastros.find(c => c.id === item.pet_id);
+            if (localPet) {
+                petNome = localPet.nome;
+                tutorNome = localPet.tutores ? localPet.tutores.nome : 'Tutor';
+            }
+        }
+
         const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
         const isPronto = (item.status || '').toLowerCase().trim() === 'pronto';
 
