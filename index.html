@@ -31,7 +31,7 @@
         <button class="nav-btn active" onclick="switchTab('atendimentos', this)"><i class="fa-solid fa-paw"></i>
             Atendimentos & Pets</button>
         <button class="nav-btn" onclick="switchTab('cadastros', this)"><i class="fa-solid fa-address-book"></i>
-            Cadastros (Tutor/Pet)</button>
+            Cadastros & Tabela de Preços</button>
         <button class="nav-btn" onclick="switchTab('caixa', this)"><i class="fa-solid fa-cash-register"></i> Caixa
             Diário</button>
     </nav>
@@ -58,54 +58,77 @@
                     <div class="service-list" id="serviceList"></div>
                 </div>
 
-                <!-- PAINEL DE PACOTES ATIVOS -->
+                <!-- PAINEL DE PACOTES ATIVOS E ADICIONAIS -->
                 <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title"><i class="fa-solid fa-box-open"></i> Pacotes Ativos</div>
-                        <button class="btn btn-purple btn-sm" onclick="openModal('modalPacote')"><i
-                                class="fa-solid fa-cart-shopping"></i> Vender Pacote</button>
+                    <div class="panel-header" style="flex-wrap: wrap; gap: 8px;">
+                        <div class="panel-title"><i class="fa-solid fa-box-open"></i> Pacotes & Avulsos</div>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn btn-purple btn-sm" onclick="openModal('modalPacote')">
+                                <i class="fa-solid fa-cart-shopping"></i> Vender Pacote
+                            </button>
+                            <!-- NOVO BOTÃO AO LADO DE VENDER PACOTE -->
+                            <button class="btn btn-green btn-sm" onclick="openModal('modalServicoAdicional')">
+                                <i class="fa-solid fa-scissors"></i> Serviços Adicionais
+                            </button>
+                        </div>
                     </div>
                     <div id="packageList"></div>
                 </div>
             </div>
         </section>
 
-        <!-- SEÇÃO 2: CADASTROS (TUTOR E PET) -->
+        <!-- SEÇÃO 2: CADASTROS E PRECIFICAÇÃO DE SERVIÇOS -->
         <section id="sec-cadastros" class="tab-content">
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
-                </div>
-                <form id="formCadastro" onsubmit="salvarCadastro(event)">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Nome do Tutor *</label>
-                            <input type="text" id="cadTutorNome" class="form-control" required
-                                placeholder="Ex: João Silva">
-                        </div>
-                        <div class="form-group">
-                            <label>WhatsApp / Telefone *</label>
-                            <input type="text" id="cadTutorFone" class="form-control" required
-                                placeholder="(61) 98888-8888">
-                        </div>
-                        <div class="form-group">
-                            <label>Nome do Pet *</label>
-                            <input type="text" id="cadPetNome" class="form-control" required placeholder="Ex: Thor">
-                        </div>
-                        <div class="form-group">
-                            <label>Raça e Porte *</label>
-                            <input type="text" id="cadPetRaca" class="form-control" required
-                                placeholder="Ex: Poodle / Médio">
-                        </div>
-                        <div class="form-group full-width">
-                            <label>Observações Fixas / Alergias</label>
-                            <textarea id="cadPetObs" class="form-control" rows="2"
-                                placeholder="Ex: Alergico a xampu com perfume, agressivo com outros cães."></textarea>
-                        </div>
+            <div class="grid-2col">
+                <!-- FORMULÁRIO DE CADASTRO INTEGRADO -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
                     </div>
-                    <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i
-                            class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
-                </form>
+                    <form id="formCadastro" onsubmit="salvarCadastro(event)">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Nome do Tutor *</label>
+                                <input type="text" id="cadTutorNome" class="form-control" required
+                                    placeholder="Ex: João Silva">
+                            </div>
+                            <div class="form-group">
+                                <label>WhatsApp / Telefone *</label>
+                                <input type="text" id="cadTutorFone" class="form-control" required
+                                    placeholder="(61) 98888-8888">
+                            </div>
+                            <div class="form-group">
+                                <label>Nome do Pet *</label>
+                                <input type="text" id="cadPetNome" class="form-control" required placeholder="Ex: Thor">
+                            </div>
+                            <div class="form-group">
+                                <label>Raça e Porte *</label>
+                                <input type="text" id="cadPetRaca" class="form-control" required
+                                    placeholder="Ex: Poodle / Médio">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Observações Fixas / Alergias</label>
+                                <textarea id="cadPetObs" class="form-control" rows="2"
+                                    placeholder="Ex: Alérgico a xampu com perfume, agressivo com outros cães."></textarea>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i
+                                class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
+                    </form>
+                </div>
+
+                <!-- PAINEL DE PRECIFICAÇÃO DE SERVIÇOS ADICIONAIS -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-tags"></i> Tabela de Preços de Adicionais</div>
+                        <button class="btn btn-sm btn-purple" onclick="salvarPrecosAdicionais()"><i
+                                class="fa-solid fa-floppy-disk"></i> Salvar Tabela</button>
+                    </div>
+                    <p style="font-size: 11px; color: #666; margin-bottom: 10px;">Ajuste os valores dos serviços
+                        avulsos/adicionais oferecidos pela loja:</p>
+                    <div id="tabelaPrecosAdicionaisContainer"
+                        style="max-height: 380px; overflow-y: auto; padding-right: 5px;"></div>
+                </div>
             </div>
         </section>
 
@@ -113,9 +136,18 @@
         <section id="sec-caixa" class="tab-content">
             <div class="panel">
                 <div class="panel-header">
-                    <div class="panel-title"><i class="fa-solid fa-chart-line"></i> Resumo Financeiro do Dia</div>
+                    <div class="panel-title"><i class="fa-solid fa-cash-register"></i> Controle de Caixa</div>
+                    <div>
+                        <button class="btn btn-green btn-sm" id="btnAbrirCaixa" onclick="openModal('modalAbrirCaixa')">
+                            <i class="fa-solid fa-lock-open"></i> Abrir Caixa
+                        </button>
+                        <button class="btn btn-red btn-sm" id="btnFecharCaixa" onclick="openModal('modalFecharCaixa')"
+                            style="display:none;">
+                            <i class="fa-solid fa-lock"></i> Fechar Caixa
+                        </button>
+                    </div>
                 </div>
-                <div class="caixa-summary-cards">
+                <div class="caixa-summary-cards" style="margin-top: 15px;">
                     <div class="card-metric">
                         <span>Total Faturado</span>
                         <h3 id="caixaTotal">R$ 0,00</h3>
@@ -133,57 +165,6 @@
                     Lançamentos de Hoje</div>
                 <div class="service-list" id="caixaLancamentos" style="margin-top:10px;"></div>
             </div>
-            <div class="panel-header" style="margin-bottom: 15px;">
-                <div class="panel-title"><i class="fa-solid fa-cash-register"></i> Controle de Caixa</div>
-                <div>
-                    <button class="btn btn-green btn-sm" id="btnAbrirCaixa" onclick="openModal('modalAbrirCaixa')">
-                        <i class="fa-solid fa-lock-open"></i> Abrir Caixa
-                    </button>
-                    <button class="btn btn-red btn-sm" id="btnFecharCaixa" onclick="openModal('modalFecharCaixa')"
-                        style="display:none;">
-                        <i class="fa-solid fa-lock"></i> Fechar Caixa
-                    </button>
-                </div>
-            </div>
-
-            <!-- MODAL ABRIR CAIXA -->
-            <div class="modal-overlay" id="modalAbrirCaixa">
-                <div class="modal">
-                    <div class="modal-header">
-                        <h3>Abertura de Caixa (Fundo / Troco)</h3>
-                        <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalAbrirCaixa')"></i>
-                    </div>
-                    <div class="form-group">
-                        <label>Valor Inicial de Troco (R$)</label>
-                        <input type="number" id="valorFundoInicial" class="form-control" value="100.00" step="0.01">
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-sm btn-gray" onclick="closeModal('modalAbrirCaixa')">Cancelar</button>
-                        <button class="btn btn-yellow btn-sm" onclick="confirmarAberturaCaixa()">Confirmar
-                            Abertura</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODAL FECHAR CAIXA -->
-            <div class="modal-overlay" id="modalFecharCaixa">
-                <div class="modal">
-                    <div class="modal-header">
-                        <h3>Fechamento Cego de Caixa</h3>
-                        <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalFecharCaixa')"></i>
-                    </div>
-                    <div class="form-group">
-                        <label>Informe o Valor Total em Dinheiro na Gaveta (R$)</label>
-                        <input type="number" id="valorGavetaInformado" class="form-control" placeholder="0.00"
-                            step="0.01">
-                    </div>
-                    <div class="modal-actions">
-                        <button class="btn btn-sm btn-gray" onclick="closeModal('modalFecharCaixa')">Cancelar</button>
-                        <button class="btn btn-purple btn-sm" onclick="confirmarFechamentoCaixa()">Encerrar
-                            Caixa</button>
-                    </div>
-                </div>
-            </div>
         </section>
 
     </div>
@@ -200,14 +181,14 @@
                 <select class="form-control" id="selectPetCheckin"></select>
             </div>
             <div class="form-group">
-                <label>Tipo de Cobrança</label>
+                <label>Tipo de Cobrança do Banho/Serviço Principal</label>
                 <select class="form-control" id="selectTipoCobranca" onchange="toggleValorAvulso()">
                     <option value="pacote">Debitar do Pacote Ativo</option>
                     <option value="avulso">Atendimento Avulso</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>Serviço Executado</label>
+                <label>Serviço Principal Executado</label>
                 <select class="form-control" id="selectServico">
                     <option value="Banho e Tosa">Banho e Tosa</option>
                     <option value="Somente Banho">Somente Banho</option>
@@ -221,8 +202,17 @@
                     <option value="entrega">Petz Lândia levará (Delivery)</option>
                 </select>
             </div>
+
+            <!-- SELEÇÃO OPÇÃO DE ADICIONAIS NO CHECKIN -->
+            <div class="form-group">
+                <label>Serviços Adicionais Opcionais (Check-in)</label>
+                <div id="checkinAdicionaisContainer"
+                    style="max-height: 120px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 6px; background: #fafafa;">
+                </div>
+            </div>
+
             <div class="form-group" id="groupValorAvulso" style="display:none;">
-                <label>Valor do Serviço (R$)</label>
+                <label>Valor do Serviço Principal (R$)</label>
                 <input type="number" id="valorAvulso" class="form-control" value="70">
             </div>
             <div class="form-group" id="groupFormaPagamentoAvulso" style="display:none;">
@@ -236,6 +226,45 @@
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalAtendimento')">Cancelar</button>
                 <button class="btn btn-purple btn-sm" onclick="salvarCheckin()">Confirmar Entrada</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: VENDA RÁPIDA DE SERVIÇOS ADICIONAIS -->
+    <div class="modal-overlay" id="modalServicoAdicional">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Vender Serviços Adicionais / Avulsos</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalServicoAdicional')"></i>
+            </div>
+            <div class="form-group">
+                <label>Selecione o Pet / Tutor</label>
+                <select class="form-control" id="selectPetAdicional"></select>
+            </div>
+            <div class="form-group">
+                <label>Selecione os Serviços Adicionais</label>
+                <div id="vendaAdicionaisListaContainer"
+                    style="max-height: 180px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 6px; background: #fff;">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Forma de Pagamento</label>
+                <select class="form-control" id="pagamentoAdicionalAvulso">
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão de Crédito/Débito</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                </select>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; background: #f0eaf4; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                <strong>Total dos Adicionais:</strong>
+                <strong id="totalVendaAdicionalText" style="color: var(--purple-main); font-size: 16px;">R$
+                    0,00</strong>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalServicoAdicional')">Cancelar</button>
+                <button class="btn btn-green btn-sm" onclick="salvarVendaAdicionalAvulso()">Lançar Venda no
+                    Caixa</button>
             </div>
         </div>
     </div>
@@ -270,6 +299,42 @@
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalPacote')">Cancelar</button>
                 <button class="btn btn-yellow btn-sm" onclick="salvarVendaPacote()">Confirmar Venda</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ABRIR CAIXA -->
+    <div class="modal-overlay" id="modalAbrirCaixa">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Abertura de Caixa (Fundo / Troco)</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalAbrirCaixa')"></i>
+            </div>
+            <div class="form-group">
+                <label>Valor Inicial de Troco (R$)</label>
+                <input type="number" id="valorFundoInicial" class="form-control" value="100.00" step="0.01">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalAbrirCaixa')">Cancelar</button>
+                <button class="btn btn-yellow btn-sm" onclick="confirmarAberturaCaixa()">Confirmar Abertura</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: FECHAR CAIXA -->
+    <div class="modal-overlay" id="modalFecharCaixa">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Fechamento Cego de Caixa</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalFecharCaixa')"></i>
+            </div>
+            <div class="form-group">
+                <label>Informe o Valor Total em Dinheiro na Gaveta (R$)</label>
+                <input type="number" id="valorGavetaInformado" class="form-control" placeholder="0.00" step="0.01">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalFecharCaixa')">Cancelar</button>
+                <button class="btn btn-purple btn-sm" onclick="confirmarFechamentoCaixa()">Encerrar Caixa</button>
             </div>
         </div>
     </div>

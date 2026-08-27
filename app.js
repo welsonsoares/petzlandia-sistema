@@ -22,6 +22,7 @@ let cadastros = [];
 let pacotes = [];
 let atendimentos = [];
 let caixaLancamentos = [];
+let servicosAdicionais = [];
 let caixaAtualSessao = null;
 
 // TRAVA DE SEGURANÇA: VALIDAR SE O CAIXA ESTÁ ABERTO
@@ -48,30 +49,28 @@ function switchTab(tabId, btnElement = null) {
     }
 
     if (tabId === 'atendimentos') carregarDadosAtendimentos();
+    if (tabId === 'cadastros') carregarTabelaPrecosAdicionais();
     if (tabId === 'caixa') carregarCaixa();
 }
 
-// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
+// 1. CARREGAR ATENDIMENTOS, PACOTES E ADICIONAIS DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
         if (!client) return;
 
         await populateSelects();
+        await carregarCatalogoAdicionais();
 
         const { data: dataAtend, error: errAtend } = await client
             .from('atendimentos')
             .select(`
-                id, pet_id, servico, tipo, tipo_entrega, status, valor, data_entrada,
+                id, pet_id, servico, tipo, tipo_entrega, status, valor, data_entrada, servicos_adicionais,
                 pets ( id, nome, tutores ( nome, telefone ) )
             `)
             .order('data_entrada', { ascending: false });
 
-        if (errAtend) {
-            console.error('Erro Supabase Atendimentos:', errAtend);
-        } else {
-            atendimentos = dataAtend || [];
-        }
+        if (!errAtend) atendimentos = dataAtend || [];
 
         const { data: dataPkg, error: errPkg } = await client
             .from('pacotes')
@@ -87,6 +86,26 @@ async function carregarDadosAtendimentos() {
         renderPacotes();
     } catch (e) {
         console.error('Erro ao carregar atendimentos:', e);
+    }
+}
+
+// CARREGAR CATÁLOGO DE SERVIÇOS ADICIONAIS
+async function carregarCatalogoAdicionais() {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('servicos_adicionais')
+            .select('*')
+            .eq('ativo', true)
+            .order('nome');
+
+        if (!error && data) {
+            servicosAdicionais = data;
+        }
+    } catch (e) {
+        console.error('Erro ao carregar serviços adicionais:', e);
     }
 }
 
@@ -142,6 +161,12 @@ function renderAtendimentos(filter = 'todos') {
         const tipoEntrega = item.tipo_entrega || 'retirada';
         const textoEntrega = tipoEntrega === 'entrega' ? 'Delivery / Táxi Pet' : 'Retirada na Loja';
 
+        // Mudar visualização dos adicionais se houver
+        let adicionaisTexto = '';
+        if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
+            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => s.nome).join(', ')}</span>`;
+        }
+
         list.innerHTML += `
             <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -151,7 +176,7 @@ function renderAtendimentos(filter = 'todos') {
                         </div>
                         <div>
                             <strong>${petNome}</strong> <small>(${tutorNome})</small>
-                            <p style="font-size:11px; color:#666;">${item.servico} • ${textoEntrega} • Entrou às ${hora}</p>
+                            <p style="font-size:11px; color:#666;">${item.servico} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
                         </div>
                     </div>
                     <div>
@@ -306,8 +331,11 @@ function renderCaixa() {
 async function populateSelects() {
     const selCheckin = document.getElementById('selectPetCheckin');
     const selPacote = document.getElementById('selectPetPacote');
+    const selAdicional = document.getElementById('selectPetAdicional');
+
     if (!selCheckin || !selPacote) return;
     selCheckin.innerHTML = ''; selPacote.innerHTML = '';
+    if (selAdicional) selAdicional.innerHTML = '';
 
     try {
         const client = getSupabase();
@@ -324,6 +352,7 @@ async function populateSelects() {
                 const opt = `<option value="${p.id}">${p.nome} (${tutorNome})</option>`;
                 selCheckin.innerHTML += opt;
                 selPacote.innerHTML += opt;
+                if (selAdicional) selAdicional.innerHTML += opt;
             });
         }
     } catch (e) {
@@ -347,7 +376,7 @@ function toggleValorAvulso() {
 
 // CONTROLAR ABERTURA DE MODAIS COM BLOQUEIO DE CAIXA FECHADO
 function openModal(id) {
-    if ((id === 'modalAtendimento' || id === 'modalPacote') && !caixaAtualSessao) {
+    if ((id === 'modalAtendimento' || id === 'modalPacote' || id === 'modalServicoAdicional') && !caixaAtualSessao) {
         if (confirm('O caixa precisa estar ABERTO para realizar vendas ou check-ins.\nDeseja abrir o caixa agora?')) {
             switchTab('caixa');
             document.getElementById('modalAbrirCaixa').style.display = 'flex';
@@ -356,12 +385,158 @@ function openModal(id) {
     }
 
     populateSelects();
-    if (id === 'modalAtendimento') toggleValorAvulso();
+    if (id === 'modalAtendimento') {
+        toggleValorAvulso();
+        renderCheckinAdicionais();
+    }
+    if (id === 'modalServicoAdicional') {
+        renderVendaAdicionaisLista();
+    }
     document.getElementById(id).style.display = 'flex';
 }
 
 function closeModal(id) {
     document.getElementById(id).style.display = 'none';
+}
+
+// TABELA DE PRECIFICAÇÃO DE ADICIONAIS (RF11)
+async function carregarTabelaPrecosAdicionais() {
+    const container = document.getElementById('tabelaPrecosAdicionaisContainer');
+    if (!container) return;
+
+    await carregarCatalogoAdicionais();
+    container.innerHTML = '';
+
+    servicosAdicionais.forEach(item => {
+        container.innerHTML += `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px;">
+                <span style="font-size: 13px; font-weight: 500;">${item.nome}</span>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="font-size: 12px; color: #555;">R$</span>
+                    <input type="number" step="0.50" min="0" class="form-control input-preco-adicional" data-id="${item.id}" value="${parseFloat(item.preco || 0).toFixed(2)}" style="width: 85px; padding: 4px 8px; font-size: 12px;">
+                </div>
+            </div>
+        `;
+    });
+}
+
+async function salvarPrecosAdicionais() {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const inputs = document.querySelectorAll('.input-preco-adicional');
+        for (let input of inputs) {
+            const id = parseInt(input.getAttribute('data-id'));
+            const novoPreco = parseFloat(input.value) || 0;
+
+            await client
+                .from('servicos_adicionais')
+                .update({ preco: novoPreco })
+                .eq('id', id);
+        }
+
+        alert('Tabela de preços atualizada com sucesso!');
+        await carregarCatalogoAdicionais();
+    } catch (e) {
+        alert('Erro ao salvar preços: ' + e.message);
+    }
+}
+
+// RENDERIZAR E CALCULAR VENDAS AVULSAS DE ADICIONAIS (RF12)
+function renderVendaAdicionaisLista() {
+    const container = document.getElementById('vendaAdicionaisListaContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    servicosAdicionais.forEach(item => {
+        const v = parseFloat(item.preco || 0).toFixed(2);
+        container.innerHTML += `
+            <label style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; cursor: pointer;">
+                <span>
+                    <input type="checkbox" class="chk-venda-adicional" value="${item.id}" data-preco="${v}" data-nome="${item.nome}" onchange="calcularTotalVendaAdicional()"> ${item.nome}
+                </span>
+                <strong style="color: var(--purple-main);">R$ ${v}</strong>
+            </label>
+        `;
+    });
+    calcularTotalVendaAdicional();
+}
+
+function calcularTotalVendaAdicional() {
+    const checkboxes = document.querySelectorAll('.chk-venda-adicional:checked');
+    let total = 0;
+    checkboxes.forEach(chk => {
+        total += parseFloat(chk.getAttribute('data-preco')) || 0;
+    });
+    document.getElementById('totalVendaAdicionalText').innerText = `R$ ${total.toFixed(2)}`;
+}
+
+async function salvarVendaAdicionalAvulso() {
+    if (!validarCaixaAberto()) return;
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const petId = parseInt(document.getElementById('selectPetAdicional').value);
+        const checkboxes = document.querySelectorAll('.chk-venda-adicional:checked');
+        const forma = document.getElementById('pagamentoAdicionalAvulso').value;
+
+        if (checkboxes.length === 0) {
+            alert('Selecione ao menos um serviço adicional.');
+            return;
+        }
+
+        let total = 0;
+        let nomes = [];
+        checkboxes.forEach(chk => {
+            total += parseFloat(chk.getAttribute('data-preco')) || 0;
+            nomes.push(chk.getAttribute('data-nome'));
+        });
+
+        const petObj = cadastros.find(p => p.id === petId);
+        const desc = `Serviços Adicionais (${nomes.join(', ')}) - ${petObj ? petObj.nome : ''}`;
+
+        const { data: lancData, error: errLanc } = await client
+            .from('caixa_lancamentos')
+            .insert([{
+                descricao: desc,
+                forma_pagamento: forma,
+                valor: total
+            }])
+            .select();
+
+        if (errLanc) {
+            alert('Erro ao lançar no caixa: ' + errLanc.message);
+            return;
+        }
+
+        closeModal('modalServicoAdicional');
+        alert('Serviços adicionais faturados e lançados no caixa!');
+        await carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+// ADICIONAIS NO CHECK-IN (RF13)
+function renderCheckinAdicionais() {
+    const container = document.getElementById('checkinAdicionaisContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    servicosAdicionais.forEach(item => {
+        const v = parseFloat(item.preco || 0).toFixed(2);
+        container.innerHTML += `
+            <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 3px 0; cursor: pointer;">
+                <span>
+                    <input type="checkbox" class="chk-checkin-adicional" value="${item.id}" data-preco="${v}" data-nome="${item.nome}"> ${item.nome}
+                </span>
+                <span style="color: #666;">+ R$ ${v}</span>
+            </label>
+        `;
+    });
 }
 
 async function salvarCadastro(e) {
@@ -392,11 +567,6 @@ async function salvarCadastro(e) {
             return;
         }
 
-        if (!tutorData || tutorData.length === 0) {
-            alert('Erro: Tutor gravado, mas ID não retornado pelo Supabase.');
-            return;
-        }
-
         const tutorId = tutorData[0].id;
 
         const { error: errPet } = await client
@@ -422,7 +592,7 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN COM VALIDAÇÃO DE CAIXA
+// 5. SALVAR CHECK-IN COM SUPORTE A ADICIONAIS
 async function salvarCheckin() {
     if (!validarCaixaAberto()) return;
 
@@ -441,7 +611,19 @@ async function salvarCheckin() {
         const servico = document.getElementById('selectServico').value;
         const selectEntregaElem = document.getElementById('selectTipoEntrega');
         const tipoEntrega = selectEntregaElem ? selectEntregaElem.value : 'retirada';
-        const valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) : 0;
+        let valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) || 0 : 0;
+
+        // Capturar adicionais do check-in
+        const chkAdicionais = document.querySelectorAll('.chk-checkin-adicional:checked');
+        let listaAdicionais = [];
+        let valorTotalAdicionais = 0;
+
+        chkAdicionais.forEach(chk => {
+            const p = parseFloat(chk.getAttribute('data-preco')) || 0;
+            const n = chk.getAttribute('data-nome');
+            listaAdicionais.push({ id: chk.value, nome: n, preco: p });
+            valorTotalAdicionais += p;
+        });
 
         if (tipo === 'pacote') {
             const { data: pkgData } = await client
@@ -463,15 +645,29 @@ async function salvarCheckin() {
                 .from('pacotes')
                 .update({ quantidade_usada: novaQtd, status: statusNovo })
                 .eq('id', pkgData.id);
+
+            // Se tiver adicionais no pacote, lança o valor extra no caixa
+            if (valorTotalAdicionais > 0) {
+                const petObj = cadastros.find(p => p.id === petId);
+                await client
+                    .from('caixa_lancamentos')
+                    .insert([{
+                        descricao: `Adicionais de Pacote (${listaAdicionais.map(a => a.nome).join(', ')}) - ${petObj ? petObj.nome : ''}`,
+                        forma_pagamento: "PIX",
+                        valor: valorTotalAdicionais
+                    }]);
+            }
         } else {
             const petObj = cadastros.find(p => p.id === petId);
             const pagtoInput = document.getElementById('pagamentoAvulso');
+            const totalComAdicionais = valor + valorTotalAdicionais;
+
             await client
                 .from('caixa_lancamentos')
                 .insert([{
-                    descricao: `Atendimento Avulso - ${petObj ? petObj.nome : ''}`,
+                    descricao: `Atendimento Avulso ${listaAdicionais.length > 0 ? '+ Adicionais' : ''} - ${petObj ? petObj.nome : ''}`,
                     forma_pagamento: pagtoInput ? pagtoInput.value : "PIX",
-                    valor: valor
+                    valor: totalComAdicionais
                 }]);
         }
 
@@ -483,7 +679,8 @@ async function salvarCheckin() {
                 tipo: tipo,
                 tipo_entrega: tipoEntrega,
                 status: 'em_andamento',
-                valor: valor
+                valor: valor + valorTotalAdicionais,
+                servicos_adicionais: listaAdicionais
             }]);
 
         if (errAtend) {
@@ -501,7 +698,6 @@ async function salvarCheckin() {
     }
 }
 
-// 6. SALVAR VENDA DE PACOTE COM VALIDAÇÃO DE CAIXA
 async function salvarVendaPacote() {
     if (!validarCaixaAberto()) return;
 
