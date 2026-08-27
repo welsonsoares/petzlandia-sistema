@@ -22,6 +22,16 @@ let cadastros = [];
 let pacotes = [];
 let atendimentos = [];
 let caixaLancamentos = [];
+let caixaAtualSessao = null;
+
+// TRAVA DE SEGURANÇA: VALIDAR SE O CAIXA ESTÁ ABERTO
+function validarCaixaAberto() {
+    if (!caixaAtualSessao) {
+        alert('Atenção: O caixa do dia está FECHADO!\nPor favor, abra o caixa na aba "Caixa Diário" para realizar vendas ou check-ins.');
+        return false;
+    }
+    return true;
+}
 
 function switchTab(tabId, btnElement = null) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -335,7 +345,16 @@ function toggleValorAvulso() {
     }
 }
 
+// CONTROLAR ABERTURA DE MODAIS COM BLOQUEIO DE CAIXA FECHADO
 function openModal(id) {
+    if ((id === 'modalAtendimento' || id === 'modalPacote') && !caixaAtualSessao) {
+        if (confirm('O caixa precisa estar ABERTO para realizar vendas ou check-ins.\nDeseja abrir o caixa agora?')) {
+            switchTab('caixa');
+            document.getElementById('modalAbrirCaixa').style.display = 'flex';
+        }
+        return;
+    }
+
     populateSelects();
     if (id === 'modalAtendimento') toggleValorAvulso();
     document.getElementById(id).style.display = 'flex';
@@ -403,8 +422,10 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN COM FORMA DE DEVOLUÇÃO
+// 5. SALVAR CHECK-IN COM VALIDAÇÃO DE CAIXA
 async function salvarCheckin() {
+    if (!validarCaixaAberto()) return;
+
     try {
         const client = getSupabase();
         if (!client) return;
@@ -480,7 +501,10 @@ async function salvarCheckin() {
     }
 }
 
+// 6. SALVAR VENDA DE PACOTE COM VALIDAÇÃO DE CAIXA
 async function salvarVendaPacote() {
+    if (!validarCaixaAberto()) return;
+
     try {
         const client = getSupabase();
         if (!client) return;
@@ -527,15 +551,7 @@ function filterServices(tipo, btn) {
     renderAtendimentos(tipo);
 }
 
-// INICIALIZAÇÃO ÚNICA DO SISTEMA
-window.addEventListener('DOMContentLoaded', () => {
-    carregarDadosAtendimentos();
-    checarStatusCaixa();
-});
-
-let caixaAtualSessao = null;
-
-// VERIFICAR STATUS DO CAIXA
+// VERIFICAR STATUS DO CAIXA NO BANCO
 async function checarStatusCaixa() {
     try {
         const client = getSupabase();
@@ -602,7 +618,6 @@ async function confirmarFechamentoCaixa() {
         const client = getSupabase();
         const informado = parseFloat(document.getElementById('valorGavetaInformado').value) || 0;
 
-        // Calcular total em dinheiro registrado nas vendas
         let totalDinheiroVendas = 0;
         caixaLancamentos.forEach(c => {
             if ((c.forma_pagamento || '').toLowerCase() === 'dinheiro') {
@@ -643,3 +658,9 @@ async function confirmarFechamentoCaixa() {
         alert('Erro ao encerrar caixa: ' + e.message);
     }
 }
+
+// INICIALIZAÇÃO ÚNICA DO SISTEMA
+window.addEventListener('DOMContentLoaded', () => {
+    carregarDadosAtendimentos();
+    checarStatusCaixa();
+});
