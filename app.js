@@ -436,6 +436,105 @@ async function salvarVendaPacote() {
     }
 }
 
+// RENDERIZAR PAINEL DE PETS PRESENTES (RF05)
+function renderAtendimentos(filter = 'todos') {
+    const list = document.getElementById('serviceList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    const filtered = filter === 'todos'
+        ? atendimentos.filter(a => a.status !== 'finalizado')
+        : atendimentos.filter(a => a.status === filter);
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum pet presente no momento.</p>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const isPkg = item.tipo === 'pacote';
+        const petNome = item.pets ? item.pets.nome : 'Pet';
+        const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
+        const tutorFone = (item.pets && item.pets.tutores) ? item.pets.tutores.telefone : '';
+        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
+        const isPronto = item.status === 'pronto';
+
+        list.innerHTML += `
+            <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="pet-info">
+                        <div class="pet-icon" style="background:${isPronto ? '#e8f5e9' : '#f0eaf4'}; color:${isPronto ? '#2e7d32' : 'var(--purple-main)'};">
+                            <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
+                        </div>
+                        <div>
+                            <strong>${petNome}</strong> <small>(${tutorNome})</small>
+                            <p style="font-size:11px; color:#666;">${item.servico} • Entrou às ${hora}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge ${isPronto ? 'badge-avulso' : 'badge-pacote'}" style="margin-right:5px;">
+                            ${isPronto ? 'Pronto para Busca' : 'Em Atendimento'}
+                        </span>
+                        <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
+                            ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #f0eaf4; padding-top:8px;">
+                    ${!isPronto ? `
+                        <button class="btn btn-sm btn-yellow" onclick="alterarStatusAtendimento(${item.id}, 'pronto')">
+                            <i class="fa-solid fa-check"></i> Marcar como Pronto
+                        </button>
+                    ` : `
+                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${tutorNome}', '${tutorFone}', '${petNome}')">
+                            <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
+                        </button>
+                        <button class="btn btn-sm btn-purple" onclick="alterarStatusAtendimento(${item.id}, 'finalizado')">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    });
+}
+
+// MUDAR STATUS DO ATENDIMENTO (RF05 & RF06)
+async function alterarStatusAtendimento(id, novoStatus) {
+    try {
+        const client = getSupabase();
+        const { error } = await client
+            .from('atendimentos')
+            .update({ status: novoStatus })
+            .eq('id', id);
+
+        if (error) {
+            alert('Erro ao atualizar status: ' + error.message);
+            return;
+        }
+
+        if (novoStatus === 'finalizado') {
+            alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
+        }
+
+        carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro ao alterar status: ' + e.message);
+    }
+}
+
+// NOTIFICAÇÃO VIA WHATSAPP (RF10)
+function notificarWhatsapp(tutorNome, fone, petNome) {
+    if (!fone) {
+        alert('Telefone do tutor não cadastrado.');
+        return;
+    }
+    const numLimpo = fone.replace(/\D/g, '');
+    const msg = encodeURIComponent(`Olá ${tutorNome}! O pet ${petNome} já finalizou o serviço na Petz Lândia e está pronto para ser buscado! 🐾`);
+    window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
+}
+
 // INICIALIZAÇÃO SEGURA APÓS O CARREGAMENTO DO DOM
 window.addEventListener('DOMContentLoaded', () => {
     carregarDadosAtendimentos();

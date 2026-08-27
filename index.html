@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
     <!-- CDN do Supabase JS -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
+
 <body>
 
     <!-- Cabeçalho -->
@@ -26,39 +28,32 @@
 
     <!-- Navegação Principal -->
     <nav class="main-nav">
-        <button class="nav-btn active" onclick="switchTab('atendimentos')"><i class="fa-solid fa-paw"></i> Atendimentos & Pets</button>
-        <button class="nav-btn" onclick="switchTab('cadastros')"><i class="fa-solid fa-address-book"></i> Cadastros (Tutor/Pet)</button>
-        <button class="nav-btn" onclick="switchTab('caixa')"><i class="fa-solid fa-cash-register"></i> Caixa Diário</button>
+        <button class="nav-btn active" onclick="switchTab('atendimentos')"><i class="fa-solid fa-paw"></i> Atendimentos
+            & Pets</button>
+        <button class="nav-btn" onclick="switchTab('cadastros')"><i class="fa-solid fa-address-book"></i> Cadastros
+            (Tutor/Pet)</button>
+        <button class="nav-btn" onclick="switchTab('caixa')"><i class="fa-solid fa-cash-register"></i> Caixa
+            Diário</button>
     </nav>
 
     <!-- Conteúdo Principal -->
     <div class="container">
-        
-        <!-- SEÇÃO 1: ATENDIMENTOS E PACOTES -->
-        <section id="sec-atendimentos" class="tab-content active">
-            <div class="grid-2col">
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title"><i class="fa-solid fa-list-check"></i> Pets na Loja Hoje</div>
-                        <button class="btn btn-yellow" onclick="openModal('modalAtendimento')"><i class="fa-solid fa-plus"></i> Novo Check-in</button>
-                    </div>
-                    <div class="filter-tabs">
-                        <button class="filter-btn active" onclick="filterServices('todos', this)">Todos</button>
-                        <button class="filter-btn" onclick="filterServices('avulso', this)">Avulsos</button>
-                        <button class="filter-btn" onclick="filterServices('pacote', this)">Pacotes</button>
-                    </div>
-                    <div class="service-list" id="serviceList"></div>
-                </div>
 
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title"><i class="fa-solid fa-box-open"></i> Pacotes Ativos</div>
-                        <button class="btn btn-purple btn-sm" onclick="openModal('modalPacote')"><i class="fa-solid fa-cart-shopping"></i> Vender Pacote</button>
-                    </div>
-                    <div id="packageList"></div>
-                </div>
+        <!-- SEÇÃO 1: ATENDIMENTOS E PACOTES -->
+        <!-- PAINEL DE PETS PRESENTES HOJE -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><i class="fa-solid fa-list-check"></i> Pets na Loja Hoje</div>
+                <button class="btn btn-yellow" onclick="openModal('modalAtendimento')"><i class="fa-solid fa-plus"></i>
+                    Novo Check-in</button>
             </div>
-        </section>
+            <div class="filter-tabs">
+                <button class="filter-btn active" onclick="filterServices('todos', this)">Todos</button>
+                <button class="filter-btn" onclick="filterServices('em_andamento', this)">Em Atendimento</button>
+                <button class="filter-btn" onclick="filterServices('pronto', this)">Prontos</button>
+            </div>
+            <div class="service-list" id="serviceList"></div>
+        </div>
 
         <!-- SEÇÃO 2: CADASTROS (TUTOR E PET) -->
         <section id="sec-cadastros" class="tab-content">
@@ -70,11 +65,13 @@
                     <div class="form-grid">
                         <div class="form-group">
                             <label>Nome do Tutor *</label>
-                            <input type="text" id="cadTutorNome" class="form-control" required placeholder="Ex: João Silva">
+                            <input type="text" id="cadTutorNome" class="form-control" required
+                                placeholder="Ex: João Silva">
                         </div>
                         <div class="form-group">
                             <label>WhatsApp / Telefone *</label>
-                            <input type="text" id="cadTutorFone" class="form-control" required placeholder="(61) 98888-8888">
+                            <input type="text" id="cadTutorFone" class="form-control" required
+                                placeholder="(61) 98888-8888">
                         </div>
                         <div class="form-group">
                             <label>Nome do Pet *</label>
@@ -82,14 +79,17 @@
                         </div>
                         <div class="form-group">
                             <label>Raça e Porte *</label>
-                            <input type="text" id="cadPetRaca" class="form-control" required placeholder="Ex: Poodle / Médio">
+                            <input type="text" id="cadPetRaca" class="form-control" required
+                                placeholder="Ex: Poodle / Médio">
                         </div>
                         <div class="form-group full-width">
                             <label>Observações Fixas / Alergias</label>
-                            <textarea id="cadPetObs" class="form-control" rows="2" placeholder="Ex: Alergico a xampu com perfume, agressivo com outros cães."></textarea>
+                            <textarea id="cadPetObs" class="form-control" rows="2"
+                                placeholder="Ex: Alergico a xampu com perfume, agressivo com outros cães."></textarea>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
+                    <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i
+                            class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
                 </form>
             </div>
         </section>
@@ -114,7 +114,8 @@
                         <h3 id="caixaOutros">R$ 0,00</h3>
                     </div>
                 </div>
-                <div class="panel-title" style="margin-top:20px;"><i class="fa-solid fa-receipt"></i> Histórico de Lançamentos de Hoje</div>
+                <div class="panel-title" style="margin-top:20px;"><i class="fa-solid fa-receipt"></i> Histórico de
+                    Lançamentos de Hoje</div>
                 <div class="service-list" id="caixaLancamentos" style="margin-top:10px;"></div>
             </div>
         </section>
@@ -202,4 +203,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
