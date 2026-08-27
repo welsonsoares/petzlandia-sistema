@@ -133,7 +133,7 @@ function renderAtendimentos(filter = 'todos') {
             }
         }
 
-        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
+        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
         const isPronto = (item.status || '').toLowerCase().trim() === 'pronto';
 
         list.innerHTML += `
