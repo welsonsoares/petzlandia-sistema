@@ -41,6 +41,7 @@ function switchTab(tabId, btnElement = null) {
     if (tabId === 'caixa') carregarCaixa();
 }
 
+// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
@@ -50,7 +51,7 @@ async function carregarDadosAtendimentos() {
             .from('atendimentos')
             .select(`
                 id, servico, tipo, status, valor, data_entrada,
-                pets ( nome, tutores ( nome, telefone ) )
+                pets ( id, nome, tutores ( nome, telefone ) )
             `)
             .order('data_entrada', { ascending: false });
 
@@ -73,17 +74,21 @@ async function carregarDadosAtendimentos() {
     }
 }
 
+// 2. RENDERIZAR PAINEL DE PETS PRESENTES
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
     list.innerHTML = '';
 
-    let filtered = [];
-    if (filter === 'todos') {
-        filtered = atendimentos.filter(a => a.status !== 'finalizado');
-    } else {
-        filtered = atendimentos.filter(a => a.status === filter);
-    }
+    let filtered = atendimentos.filter(a => {
+        const st = (a.status || '').toLowerCase().trim();
+        if (st === 'finalizado') return false;
+
+        if (filter === 'todos') return true;
+        if (filter === 'em_andamento') return st === 'em_andamento' || st === 'em atendimento';
+        if (filter === 'pronto') return st === 'pronto';
+        return true;
+    });
 
     if (filtered.length === 0) {
         list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento presente no momento.</p>`;
@@ -96,7 +101,7 @@ function renderAtendimentos(filter = 'todos') {
         const tutorNome = (item.pets && item.pets.tutores) ? item.pets.tutores.nome : 'Tutor';
         const tutorFone = (item.pets && item.pets.tutores) ? item.pets.tutores.telefone : '';
         const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-2-digit', minute: '2-2-digit' }) : '--:--';
-        const isPronto = item.status === 'pronto';
+        const isPronto = (item.status || '').toLowerCase().trim() === 'pronto';
 
         list.innerHTML += `
             <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
@@ -139,6 +144,7 @@ function renderAtendimentos(filter = 'todos') {
     });
 }
 
+// 3. ALTERAR STATUS DE ATENDIMENTO
 async function alterarStatusAtendimento(id, novoStatus) {
     try {
         const client = getSupabase();
@@ -158,7 +164,7 @@ async function alterarStatusAtendimento(id, novoStatus) {
             alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
         }
 
-        carregarDadosAtendimentos();
+        await carregarDadosAtendimentos();
     } catch (e) {
         alert('Erro ao alterar status: ' + e.message);
     }
@@ -362,6 +368,7 @@ async function salvarCadastro(e) {
     }
 }
 
+// 5. SALVAR CHECK-IN NO SUPABASE (SINCRO AUTOMÁTICO)
 async function salvarCheckin() {
     try {
         const client = getSupabase();
@@ -404,7 +411,8 @@ async function salvarCheckin() {
                 }]);
         }
 
-        await client
+        // Inserção no banco com status 'em_andamento'
+        const { error: errAtend } = await client
             .from('atendimentos')
             .insert([{
                 pet_id: petId,
@@ -414,8 +422,17 @@ async function salvarCheckin() {
                 valor: valor
             }]);
 
+        if (errAtend) {
+            alert('Erro ao registrar entrada do pet: ' + errAtend.message);
+            return;
+        }
+
         closeModal('modalAtendimento');
-        carregarDadosAtendimentos();
+
+        // Rebusca dados atualizados e força renderização imediata
+        await carregarDadosAtendimentos();
+        alert('Check-in realizado com sucesso! Pet inserido na lista da loja.');
+
     } catch (e) {
         alert('Erro ao salvar check-in: ' + e.message);
     }
@@ -456,7 +473,7 @@ async function salvarVendaPacote() {
 
         closeModal('modalPacote');
         alert('Pacote cadastrado com validade de 30 dias e lançado no caixa!');
-        carregarDadosAtendimentos();
+        await carregarDadosAtendimentos();
     } catch (e) {
         alert('Erro ao vender pacote: ' + e.message);
     }
