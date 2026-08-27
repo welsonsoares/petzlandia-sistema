@@ -7,7 +7,7 @@ var _supabase = null;
 function getSupabase() {
     if (!_supabase) {
         const globalSupabase = window.supabase || typeof supabase !== 'undefined' ? supabase : null;
-        
+
         if (globalSupabase && typeof globalSupabase.createClient === 'function') {
             _supabase = globalSupabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         } else {
@@ -28,7 +28,7 @@ let caixaLancamentos = [];
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    
+
     document.getElementById(`sec-${tabId}`).classList.add('active');
     if (event && event.currentTarget) event.currentTarget.classList.add('active');
 
@@ -40,7 +40,7 @@ function switchTab(tabId) {
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
-        
+
         // Buscar Atendimentos de Hoje
         const { data: dataAtend, error: errAtend } = await client
             .from('atendimentos')
@@ -154,7 +154,7 @@ function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
     list.innerHTML = '';
-    
+
     let total = 0, pix = 0, outros = 0;
 
     caixaLancamentos.forEach(c => {
@@ -211,7 +211,7 @@ function toggleValorAvulso() {
     const tipo = document.getElementById('selectTipoCobranca').value;
     const groupValor = document.getElementById('groupValorAvulso');
     const groupPagto = document.getElementById('groupFormaPagamentoAvulso');
-    
+
     if (tipo === 'avulso') {
         if (groupValor) groupValor.style.display = 'block';
         if (groupPagto) groupPagto.style.display = 'block';
@@ -392,6 +392,48 @@ function filterServices(tipo, btn) {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderAtendimentos(tipo);
+}
+
+// Atualização na função salvarVendaPacote() no app.js
+async function salvarVendaPacote() {
+    try {
+        const client = getSupabase();
+        const petId = parseInt(document.getElementById('selectPetPacote').value);
+        const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
+        const valor = parseFloat(document.getElementById('valorPacote').value);
+        const forma = document.getElementById('pagamentoPacote').value;
+        const petObj = cadastros.find(p => p.id === petId);
+
+        // Calcular data de validade (30 dias a partir de hoje)
+        const dataHoje = new Date();
+        dataHoje.setDate(dataHoje.getDate() + 30);
+        const dataValidade = dataHoje.toISOString().split('T')[0];
+
+        // Criar Pacote com data_validade
+        await client
+            .from('pacotes')
+            .insert([{
+                pet_id: petId,
+                quantidade_total: qtd,
+                quantidade_usada: 0,
+                status: 'ativo',
+                data_validade: dataValidade
+            }]);
+
+        await client
+            .from('caixa_lancamentos')
+            .insert([{
+                descricao: `Venda Pacote (${qtd} Banhos) - ${petObj ? petObj.nome : ''}`,
+                forma_pagamento: forma,
+                valor: valor
+            }]);
+
+        closeModal('modalPacote');
+        alert('Pacote cadastrado com validade de 30 dias e lançado no caixa!');
+        carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro ao vender pacote: ' + e.message);
+    }
 }
 
 // INICIALIZAÇÃO SEGURA APÓS O CARREGAMENTO DO DOM
