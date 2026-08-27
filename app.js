@@ -41,13 +41,13 @@ function switchTab(tabId, btnElement = null) {
     if (tabId === 'caixa') carregarCaixa();
 }
 
-// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE (CORRIGIDO)
+// 1. CARREGAR ATENDIMENTOS E PACOTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
         if (!client) return;
 
-        // Primeiro garante que a lista de pets/tutores está atualizada na memória
+        // Atualiza a lista de pets cadastrados para garantir fallback local
         await populateSelects();
 
         const { data: dataAtend, error: errAtend } = await client
@@ -59,15 +59,16 @@ async function carregarDadosAtendimentos() {
             .order('data_entrada', { ascending: false });
 
         if (errAtend) {
-            console.error('Erro na busca de atendimentos:', errAtend);
+            console.error('Erro Supabase Atendimentos:', errAtend);
         } else {
+            console.log('Atendimentos retornados do Supabase:', dataAtend);
             atendimentos = dataAtend || [];
         }
 
         const { data: dataPkg, error: errPkg } = await client
             .from('pacotes')
             .select(`
-                id, pet_id, quantidade_total, quantidade_usada, status,
+                id, quantidade_total, quantidade_usada, status,
                 pets ( nome, tutores ( nome ) )
             `)
             .eq('status', 'ativo');
@@ -81,14 +82,16 @@ async function carregarDadosAtendimentos() {
     }
 }
 
-// 2. RENDERIZAR PAINEL DE PETS PRESENTES (COM FALLBACK DE SEGURANÇA)
+// 2. RENDERIZAR PAINEL DE PETS PRESENTES
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
     list.innerHTML = '';
 
+    console.log('Executando renderAtendimentos com filtro:', filter, 'Total itens:', atendimentos.length);
+
     let filtered = atendimentos.filter(a => {
-        const st = (a.status || '').toLowerCase().trim();
+        const st = (a.status || 'em_andamento').toLowerCase().trim();
         if (st === 'finalizado') return false;
 
         if (filter === 'todos') return true;
@@ -105,23 +108,28 @@ function renderAtendimentos(filter = 'todos') {
     filtered.forEach(item => {
         const isPkg = item.tipo === 'pacote';
 
-        // Buscando dados do Pet/Tutor diretamente do Supabase ou com fallback do cadastro local
-        let petNome = 'Pet';
-        let tutorNome = 'Tutor';
+        let petNome = 'Pet Sem Nome';
+        let tutorNome = 'Tutor Não Informado';
         let tutorFone = '';
 
+        // Tenta ler do JOIN do Supabase
         if (item.pets) {
-            petNome = item.pets.nome || 'Pet';
+            petNome = item.pets.nome || petNome;
             if (item.pets.tutores) {
-                tutorNome = item.pets.tutores.nome || 'Tutor';
+                tutorNome = item.pets.tutores.nome || tutorNome;
                 tutorFone = item.pets.tutores.telefone || '';
             }
-        } else {
-            // Fallback caso o JOIN do Supabase retorne nulo
+        }
+
+        // Se o JOIN vier vazio, resgata do cadastro carregado localmente
+        if (petNome === 'Pet Sem Nome' && item.pet_id) {
             const localPet = cadastros.find(c => c.id === item.pet_id);
             if (localPet) {
                 petNome = localPet.nome;
-                tutorNome = localPet.tutores ? localPet.tutores.nome : 'Tutor';
+                if (localPet.tutores) {
+                    tutorNome = localPet.tutores.nome;
+                    tutorFone = localPet.tutores.telefone || '';
+                }
             }
         }
 
@@ -292,7 +300,7 @@ async function populateSelects() {
 
         const { data, error } = await client
             .from('pets')
-            .select(`id, nome, tutores ( nome )`);
+            .select(`id, nome, tutores ( nome, telefone )`);
 
         if (!error && data) {
             cadastros = data;
@@ -393,13 +401,19 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN NO SUPABASE (SINCRO AUTOMÁTICO)
+// 5. SALVAR CHECK-IN NO SUPABASE
 async function salvarCheckin() {
     try {
         const client = getSupabase();
         if (!client) return;
 
-        const petId = parseInt(document.getElementById('selectPetCheckin').value);
+        const petSelect = document.getElementById('selectPetCheckin');
+        if (!petSelect || !petSelect.value) {
+            alert('Selecione um pet para realizar o check-in.');
+            return;
+        }
+
+        const petId = parseInt(petSelect.value);
         const tipo = document.getElementById('selectTipoCobranca').value;
         const servico = document.getElementById('selectServico').value;
         const valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) : 0;
@@ -436,7 +450,7 @@ async function salvarCheckin() {
                 }]);
         }
 
-        // Inserção no banco com status 'em_andamento'
+        // Grava no Supabase garantindo o valor 'em_andamento'
         const { error: errAtend } = await client
             .from('atendimentos')
             .insert([{
@@ -448,15 +462,15 @@ async function salvarCheckin() {
             }]);
 
         if (errAtend) {
-            alert('Erro ao registrar entrada do pet: ' + errAtend.message);
+            alert('Erro ao gravar Atendimento no Supabase: ' + errAtend.message);
             return;
         }
 
         closeModal('modalAtendimento');
+        alert('Check-in realizado com sucesso!');
 
-        // Rebusca dados atualizados e força renderização imediata
+        // Rebusca os dados e renderiza novamente
         await carregarDadosAtendimentos();
-        alert('Check-in realizado com sucesso! Pet inserido na lista da loja.');
 
     } catch (e) {
         alert('Erro ao salvar check-in: ' + e.message);
