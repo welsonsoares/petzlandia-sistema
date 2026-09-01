@@ -168,9 +168,13 @@
             <div class="panel">
                 <div class="panel-header">
                     <div class="panel-title"><i class="fa-solid fa-cash-register"></i> Controle de Caixa</div>
-                    <div>
+                    <div style="display: flex; gap: 6px;">
                         <button class="btn btn-green btn-sm" id="btnAbrirCaixa" onclick="openModal('modalAbrirCaixa')">
                             <i class="fa-solid fa-lock-open"></i> Abrir Caixa
+                        </button>
+                        <button class="btn btn-yellow btn-sm" id="btnSangriaCaixa"
+                            onclick="openModal('modalSangriaCaixa')" style="display:none;">
+                            <i class="fa-solid fa-hand-holding-dollar"></i> Realizar Sangria
                         </button>
                         <button class="btn btn-red btn-sm" id="btnFecharCaixa" onclick="openModal('modalFecharCaixa')"
                             style="display:none;">
@@ -358,6 +362,29 @@
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalAbrirCaixa')">Cancelar</button>
                 <button class="btn btn-yellow btn-sm" onclick="confirmarAberturaCaixa()">Confirmar Abertura</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SANGRIA DE CAIXA (RF15) -->
+    <div class="modal-overlay" id="modalSangriaCaixa">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Sangria / Retirada de Caixa</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalSangriaCaixa')"></i>
+            </div>
+            <div class="form-group">
+                <label>Valor da Sangria (R$)</label>
+                <input type="number" id="valorSangriaInput" class="form-control" placeholder="0.00" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Motivo / Descrição da Retirada *</label>
+                <input type="text" id="motivoSangriaInput" class="form-control"
+                    placeholder="Ex: Pagamento de fornecedor / Despesa de limpeza">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalSangriaCaixa')">Cancelar</button>
+                <button class="btn btn-yellow btn-sm" onclick="confirmarSangriaCaixa()">Confirmar Sangria</button>
             </div>
         </div>
     </div>

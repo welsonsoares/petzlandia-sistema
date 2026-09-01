@@ -315,13 +315,16 @@ function renderCaixa() {
         if (c.forma_pagamento === 'PIX') pix += v;
         else outros += v;
 
+        const isSangria = v < 0;
+        const corValor = isSangria ? '#d32f2f' : 'var(--green-badge)';
+
         list.innerHTML += `
             <div class="service-item">
                 <div>
                     <strong>${c.descricao}</strong>
                     <p style="font-size:11px; color:#666;">Forma de Pagamento: ${c.forma_pagamento}</p>
                 </div>
-                <strong style="color:var(--green-badge);">+ R$ ${v.toFixed(2)}</strong>
+                <strong style="color:${corValor};">${isSangria ? '- R$ ' + Math.abs(v).toFixed(2) : '+ R$ ' + v.toFixed(2)}</strong>
             </div>
         `;
     });
@@ -763,15 +766,18 @@ async function checarStatusCaixa() {
 
         const btnAbrir = document.getElementById('btnAbrirCaixa');
         const btnFechar = document.getElementById('btnFecharCaixa');
+        const btnSangria = document.getElementById('btnSangriaCaixa');
 
         if (!error && data && data.length > 0) {
             caixaAtualSessao = data[0];
             if (btnAbrir) btnAbrir.style.display = 'none';
             if (btnFechar) btnFechar.style.display = 'inline-block';
+            if (btnSangria) btnSangria.style.display = 'inline-block';
         } else {
             caixaAtualSessao = null;
             if (btnAbrir) btnAbrir.style.display = 'inline-block';
             if (btnFechar) btnFechar.style.display = 'none';
+            if (btnSangria) btnSangria.style.display = 'none';
         }
     } catch (e) {
         console.error('Erro ao checar caixa:', e);
@@ -804,7 +810,67 @@ async function confirmarAberturaCaixa() {
     }
 }
 
-// CONFIRMAR FECHAMENTO CEGO DE CAIXA
+// CONFIRMAR SANGRIA DE CAIXA (RF15)
+async function confirmarSangriaCaixa() {
+    if (!validarPermissaoAdmin()) return;
+    if (!caixaAtualSessao) {
+        alert('Nenhum caixa aberto no momento.');
+        return;
+    }
+
+    const valorInput = document.getElementById('valorSangriaInput');
+    const motivoInput = document.getElementById('motivoSangriaInput');
+
+    const valor = parseFloat(valorInput.value) || 0;
+    const motivo = motivoInput.value.trim();
+
+    if (valor <= 0) {
+        alert('Informe um valor válido para a sangria.');
+        return;
+    }
+
+    if (!motivo) {
+        alert('Informe o motivo ou descrição da sangria.');
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error: errLanc } = await client
+            .from('caixa_lancamentos')
+            .insert([{
+                descricao: `[SANGRIA] ${motivo}`,
+                forma_pagamento: 'Dinheiro',
+                valor: -valor
+            }]);
+
+        if (errLanc) {
+            alert('Erro ao registrar sangria: ' + errLanc.message);
+            return;
+        }
+
+        const novoTotalSangrias = (parseFloat(caixaAtualSessao.total_sangrias) || 0) + valor;
+        await client
+            .from('caixa_sessoes')
+            .update({ total_sangrias: novoTotalSangrias })
+            .eq('id', caixaAtualSessao.id);
+
+        closeModal('modalSangriaCaixa');
+        valorInput.value = '';
+        motivoInput.value = '';
+
+        alert(`Sangria de R$ ${valor.toFixed(2)} realizada com sucesso!`);
+        await carregarCaixa();
+        await checarStatusCaixa();
+
+    } catch (e) {
+        alert('Erro ao realizar sangria: ' + e.message);
+    }
+}
+
+// CONFIRMAR FECHAMENTO CEGO DE CAIXA (RF15)
 async function confirmarFechamentoCaixa() {
     try {
         if (!caixaAtualSessao) {
@@ -822,7 +888,8 @@ async function confirmarFechamentoCaixa() {
             }
         });
 
-        const esperado = parseFloat(caixaAtualSessao.valor_inicial) + totalDinheiroVendas;
+        const totalSangrias = parseFloat(caixaAtualSessao.total_sangrias) || 0;
+        const esperado = (parseFloat(caixaAtualSessao.valor_inicial) + totalDinheiroVendas) - totalSangrias;
         const diferenca = informado - esperado;
 
         const { error } = await client
@@ -845,6 +912,7 @@ async function confirmarFechamentoCaixa() {
 
         let msgResumo = `Caixa Encerrado com Sucesso!\n\n`;
         msgResumo += `• Fundo Inicial: R$ ${parseFloat(caixaAtualSessao.valor_inicial).toFixed(2)}\n`;
+        msgResumo += `• Sangrias Retiradas: R$ ${totalSangrias.toFixed(2)}\n`;
         msgResumo += `• Esperado em Dinheiro: R$ ${esperado.toFixed(2)}\n`;
         msgResumo += `• Informado na Gaveta: R$ ${informado.toFixed(2)}\n`;
         msgResumo += `• Diferença: R$ ${diferenca.toFixed(2)}`;
@@ -1008,6 +1076,7 @@ async function carregarHistoricoCaixas() {
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: #555;">
                         <div>Troco Inicial: <strong>R$ ${parseFloat(sessao.valor_inicial || 0).toFixed(2)}</strong></div>
+                        <div>Sangrias: <strong style="color:#d32f2f;">R$ ${parseFloat(sessao.total_sangrias || 0).toFixed(2)}</strong></div>
                         <div>Esperado Dinheiro: <strong>R$ ${parseFloat(sessao.valor_esperado || 0).toFixed(2)}</strong></div>
                         <div>Informado Gaveta: <strong>R$ ${parseFloat(sessao.valor_final_informado || 0).toFixed(2)}</strong></div>
                         <div>Diferença: <strong style="color: ${corDiferenca}">R$ ${diferenca.toFixed(2)}</strong></div>
