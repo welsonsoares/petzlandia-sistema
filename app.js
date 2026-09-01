@@ -384,6 +384,111 @@ async function estornarLancamentoCaixa(idLancamento) {
     }
 }
 
+// EXPORTAR LANÇAMENTOS DO CAIXA PARA CSV (RF17)
+function exportarCaixaCSV() {
+    if (!caixaLancamentos || caixaLancamentos.length === 0) {
+        alert('Não há lançamentos no caixa para exportar.');
+        return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,ID;Descricao;Forma Pagamento;Valor;Status;Data\n";
+
+    caixaLancamentos.forEach(c => {
+        const dataFormatada = c.data_lancamento
+            ? new Date(c.data_lancamento).toLocaleString('pt-BR')
+            : '';
+        const linha = `${c.id};"${c.descricao}";${c.forma_pagamento};${parseFloat(c.valor || 0).toFixed(2)};${c.status || 'ativo'};${dataFormatada}`;
+        csvContent += linha + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+
+    const dataHoje = new Date().toISOString().split('T')[0];
+    link.setAttribute("download", `fechamento_caixa_${dataHoje}.csv`);
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// IMPRIMIR RELATÓRIO SINTÉTICO DO CAIXA DIÁRIO (RF17)
+function imprimirRelatorioCaixa() {
+    if (!caixaLancamentos || caixaLancamentos.length === 0) {
+        alert('Não há dados de caixa para gerar relatório.');
+        return;
+    }
+
+    let total = 0, pix = 0, dinheiro = 0, cartao = 0;
+
+    caixaLancamentos.forEach(c => {
+        if (c.status !== 'cancelado') {
+            const v = parseFloat(c.valor || 0);
+            total += v;
+            const forma = (c.forma_pagamento || '').toLowerCase();
+            if (forma === 'pix') pix += v;
+            else if (forma === 'dinheiro') dinheiro += v;
+            else cartao += v;
+        }
+    });
+
+    const janelaImpressao = window.open('', '', 'width=800,height=600');
+    janelaImpressao.document.write(`
+        <html>
+        <head>
+            <title>Relatório de Fechamento de Caixa - Petz Lândia</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                h2 { color: #6a1b9a; margin-bottom: 5px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+                th { background-color: #f0eaf4; }
+                .resumo { margin-top: 15px; background: #fafafa; padding: 10px; border-radius: 5px; }
+                .cancelado { text-decoration: line-through; color: #888; }
+            </style>
+        </head>
+        <body>
+            <h2>Petz Lândia - Extrato de Caixa</h2>
+            <p>Data do Relatório: ${new Date().toLocaleString('pt-BR')}</p>
+            
+            <div class="resumo">
+                <strong>Resumo do Faturamento:</strong><br>
+                • Total Faturado: R$ ${total.toFixed(2)}<br>
+                • Total em PIX: R$ ${pix.toFixed(2)}<br>
+                • Total em Dinheiro: R$ ${dinheiro.toFixed(2)}<br>
+                • Total em Cartão: R$ ${cartao.toFixed(2)}
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Pagamento</th>
+                        <th>Valor (R$)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${caixaLancamentos.map(c => `
+                        <tr class="${c.status === 'cancelado' ? 'cancelado' : ''}">
+                            <td>${c.descricao}</td>
+                            <td>${c.forma_pagamento}</td>
+                            <td>R$ ${parseFloat(c.valor || 0).toFixed(2)}</td>
+                            <td>${c.status || 'ativo'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+            <script>
+                window.onload = function() { window.print(); window.close(); }
+            </script>
+        </body>
+        </html>
+    `);
+    janelaImpressao.document.close();
+}
+
 async function populateSelects() {
     const selCheckin = document.getElementById('selectPetCheckin');
     const selPacote = document.getElementById('selectPetPacote');

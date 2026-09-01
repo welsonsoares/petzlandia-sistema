@@ -207,8 +207,20 @@
                     </div>
                 </div>
 
-                <div class="panel-title" style="margin-top:20px;"><i class="fa-solid fa-receipt"></i> Histórico de
-                    Lançamentos de Hoje</div>
+                <!-- PAINEL DE LANÇAMENTOS DO DIA COM EXPORTAÇÃO (RF17) -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-receipt"></i> Histórico de Lançamentos de Hoje
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-purple" onclick="exportarCaixaCSV()">
+                            <i class="fa-solid fa-file-csv"></i> Exportar CSV
+                        </button>
+                        <button class="btn btn-sm btn-gray" onclick="imprimirRelatorioCaixa()">
+                            <i class="fa-solid fa-print"></i> Imprimir Relatório
+                        </button>
+                    </div>
+                </div>
                 <div class="service-list" id="caixaLancamentos" style="margin-top:10px;"></div>
             </div>
         </section>
