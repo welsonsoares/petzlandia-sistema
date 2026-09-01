@@ -23,6 +23,7 @@ let pacotes = [];
 let atendimentos = [];
 let caixaLancamentos = [];
 let servicosAdicionais = [];
+let atendentes = [];
 let caixaAtualSessao = null;
 let usuarioLogado = null;
 
@@ -50,14 +51,17 @@ function switchTab(tabId, btnElement = null) {
     }
 
     if (tabId === 'atendimentos') carregarDadosAtendimentos();
-    if (tabId === 'cadastros') carregarTabelaPrecosAdicionais();
+    if (tabId === 'cadastros') {
+        carregarTabelaPrecosAdicionais();
+        carregarAtendentes();
+    }
     if (tabId === 'caixa') {
         carregarCaixa();
         carregarHistoricoCaixas();
     }
 }
 
-// 1. CARREGAR ATENDIMENTOS, PACOTES E ADICIONAIS DO SUPABASE
+// 1. CARREGAR ATENDIMENTOS, PACOTES, ADICIONAIS E ATENDENTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
@@ -65,12 +69,15 @@ async function carregarDadosAtendimentos() {
 
         await populateSelects();
         await carregarCatalogoAdicionais();
+        await carregarAtendentes();
 
         const { data: dataAtend, error: errAtend } = await client
             .from('atendimentos')
             .select(`
                 id, pet_id, servico, tipo, tipo_entrega, status, valor, data_entrada, servicos_adicionais,
-                pets ( id, nome, tutores ( nome, telefone ) )
+                pets ( id, nome, tutores ( nome, telefone ) ),
+                atendente_checkin:atendente_checkin_id ( nome ),
+                atendente_checkout:atendente_checkout_id ( nome )
             `)
             .order('data_entrada', { ascending: false });
 
@@ -91,6 +98,91 @@ async function carregarDadosAtendimentos() {
     } catch (e) {
         console.error('Erro ao carregar atendimentos:', e);
     }
+}
+
+// CARREGAR CATÁLOGO DE ATENDENTES
+async function carregarAtendentes() {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('atendentes')
+            .select('*')
+            .eq('ativo', true)
+            .order('nome');
+
+        if (!error && data) {
+            atendentes = data;
+            popularSelectsAtendentes();
+            renderListaAtendentes();
+        }
+    } catch (e) {
+        console.error('Erro ao carregar atendentes:', e);
+    }
+}
+
+// POPULAR SELECTS DE ATENDENTES NOS MODAIS
+function popularSelectsAtendentes() {
+    const ids = [
+        'selectAtendenteCheckin',
+        'selectAtendenteCheckout',
+        'selectAtendenteVendaAdicional',
+        'selectAtendenteVendaPacote'
+    ];
+
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = '<option value="">Selecione o Atendente...</option>';
+            atendentes.forEach(a => {
+                el.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+            });
+        }
+    });
+}
+
+// CADASTRAR ATENDENTE
+async function salvarAtendente(e) {
+    if (e) e.preventDefault();
+    const inputNome = document.getElementById('cadAtendenteNome');
+    const nome = inputNome.value.trim();
+
+    if (!nome) return;
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client.from('atendentes').insert([{ nome: nome }]);
+
+        if (error) {
+            alert('Erro ao cadastrar atendente: ' + error.message);
+            return;
+        }
+
+        inputNome.value = '';
+        alert('Atendente cadastrado com sucesso!');
+        await carregarAtendentes();
+    } catch (e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+// RENDERIZAR LISTA DE ATENDENTES
+function renderListaAtendentes() {
+    const container = document.getElementById('listaAtendentesContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+    atendentes.forEach(a => {
+        container.innerHTML += `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 12px;">
+                <span><i class="fa-solid fa-user-check" style="color:var(--purple-main);"></i> ${a.nome}</span>
+                <span class="badge badge-pacote" style="background:#e8f5e9; color:#2e7d32;">Ativo</span>
+            </div>
+        `;
+    });
 }
 
 // CARREGAR CATÁLOGO DE SERVIÇOS ADICIONAIS
@@ -170,6 +262,9 @@ function renderAtendimentos(filter = 'todos') {
             adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => s.nome).join(', ')}</span>`;
         }
 
+        let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${item.atendente_checkin.nome}</span>` : '';
+        let tagCheckout = item.atendente_checkout ? `<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-check"></i> Out: ${item.atendente_checkout.nome}</span>` : '';
+
         list.innerHTML += `
             <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -178,7 +273,7 @@ function renderAtendimentos(filter = 'todos') {
                             <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
                         </div>
                         <div>
-                            <strong>${petNome}</strong> <small>(${tutorNome})</small>
+                            <strong>${petNome}</strong> <small>(${tutorNome})</small> ${tagCheckin} ${tagCheckout}
                             <p style="font-size:11px; color:#666;">${item.servico} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
                         </div>
                     </div>
@@ -201,7 +296,7 @@ function renderAtendimentos(filter = 'todos') {
                         <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${tutorNome}', '${tutorFone}', '${petNome}', '${tipoEntrega}')">
                             <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
                         </button>
-                        <button class="btn btn-sm btn-purple" onclick="alterarStatusAtendimento(${item.id}, 'finalizado')">
+                        <button class="btn btn-sm btn-purple" onclick="abrirModalCheckout(${item.id})">
                             <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
                         </button>
                     `}
@@ -227,13 +322,50 @@ async function alterarStatusAtendimento(id, novoStatus) {
             return;
         }
 
-        if (novoStatus === 'finalizado') {
-            alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
-        }
-
         await carregarDadosAtendimentos();
     } catch (e) {
         alert('Erro ao alterar status: ' + e.message);
+    }
+}
+
+// ABRIR MODAL DE CHECK-OUT COM ATENDENTE
+function abrirModalCheckout(atendimentoId) {
+    document.getElementById('checkoutAtendimentoId').value = atendimentoId;
+    openModal('modalCheckout');
+}
+
+// CONFIRMAR CHECK-OUT REGISTRANDO O ATENDENTE
+async function confirmarCheckoutAtendimento() {
+    const id = document.getElementById('checkoutAtendimentoId').value;
+    const atendenteId = document.getElementById('selectAtendenteCheckout').value;
+
+    if (!atendenteId) {
+        alert('Selecione o atendente responsável pelo check-out.');
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client
+            .from('atendimentos')
+            .update({
+                status: 'finalizado',
+                atendente_checkout_id: parseInt(atendenteId)
+            })
+            .eq('id', id);
+
+        if (error) {
+            alert('Erro ao atualizar status: ' + error.message);
+            return;
+        }
+
+        closeModal('modalCheckout');
+        alert('Check-out realizado com sucesso! Pet entregue ao tutor.');
+        await carregarDadosAtendimentos();
+    } catch (e) {
+        alert('Erro: ' + e.message);
     }
 }
 
@@ -292,7 +424,10 @@ async function carregarCaixa() {
 
         const { data, error } = await client
             .from('caixa_lancamentos')
-            .select('*')
+            .select(`
+                *,
+                atendentes:atendente_id ( nome )
+            `)
             .order('data_lancamento', { ascending: false });
 
         if (!error) caixaLancamentos = data || [];
@@ -302,7 +437,7 @@ async function carregarCaixa() {
     }
 }
 
-// RENDERIZAR CAIXA COM BOTÃO DE ESTORNO PARA ADMIN (RF16)
+// RENDERIZAR CAIXA COM BOTÃO DE ESTORNO E ATENDENTE
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
@@ -325,11 +460,13 @@ function renderCaixa() {
         let corValor = isSangria ? '#d32f2f' : 'var(--green-badge)';
         if (isCancelado) corValor = '#9e9e9e';
 
+        let nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema/Admin';
+
         list.innerHTML += `
             <div class="service-item" style="${isCancelado ? 'opacity: 0.55; background: #f5f5f5;' : ''}">
                 <div>
                     <strong>${c.descricao} ${isCancelado ? '<small style="color: #d32f2f; font-weight:bold;">(CANCELADO)</small>' : ''}</strong>
-                    <p style="font-size:11px; color:#666;">Forma de Pagamento: ${c.forma_pagamento}</p>
+                    <p style="font-size:11px; color:#666;">Forma de Pagamento: ${c.forma_pagamento} <span style="color: #6a1b9a; font-weight: 500;">• Op: ${nomeAtend}</span></p>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <strong style="color:${corValor}; ${isCancelado ? 'text-decoration: line-through;' : ''}">
@@ -350,7 +487,7 @@ function renderCaixa() {
     document.getElementById('caixaOutros').innerText = `R$ ${outros.toFixed(2)}`;
 }
 
-// ESTORNAR / CANCELAR LANÇAMENTO DE CAIXA (RF16)
+// ESTORNAR LANÇAMENTO
 async function estornarLancamentoCaixa(idLancamento) {
     if (!validarPermissaoAdmin()) return;
 
@@ -384,20 +521,21 @@ async function estornarLancamentoCaixa(idLancamento) {
     }
 }
 
-// EXPORTAR LANÇAMENTOS DO CAIXA PARA CSV (RF17)
+// EXPORTAR CAIXA CSV
 function exportarCaixaCSV() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há lançamentos no caixa para exportar.');
         return;
     }
 
-    let csvContent = "data:text/csv;charset=utf-8,ID;Descricao;Forma Pagamento;Valor;Status;Data\n";
+    let csvContent = "data:text/csv;charset=utf-8,ID;Descricao;Forma Pagamento;Atendente;Valor;Status;Data\n";
 
     caixaLancamentos.forEach(c => {
         const dataFormatada = c.data_lancamento
             ? new Date(c.data_lancamento).toLocaleString('pt-BR')
             : '';
-        const linha = `${c.id};"${c.descricao}";${c.forma_pagamento};${parseFloat(c.valor || 0).toFixed(2)};${c.status || 'ativo'};${dataFormatada}`;
+        const nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema/Admin';
+        const linha = `${c.id};"${c.descricao}";${c.forma_pagamento};"${nomeAtend}";${parseFloat(c.valor || 0).toFixed(2)};${c.status || 'ativo'};${dataFormatada}`;
         csvContent += linha + "\n";
     });
 
@@ -413,7 +551,7 @@ function exportarCaixaCSV() {
     document.body.removeChild(link);
 }
 
-// IMPRIMIR RELATÓRIO SINTÉTICO DO CAIXA DIÁRIO (RF17)
+// IMPRIMIR RELATÓRIO DO CAIXA
 function imprimirRelatorioCaixa() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há dados de caixa para gerar relatório.');
@@ -464,6 +602,7 @@ function imprimirRelatorioCaixa() {
                 <thead>
                     <tr>
                         <th>Descrição</th>
+                        <th>Atendente</th>
                         <th>Pagamento</th>
                         <th>Valor (R$)</th>
                         <th>Status</th>
@@ -473,6 +612,7 @@ function imprimirRelatorioCaixa() {
                     ${caixaLancamentos.map(c => `
                         <tr class="${c.status === 'cancelado' ? 'cancelado' : ''}">
                             <td>${c.descricao}</td>
+                            <td>${c.atendentes ? c.atendentes.nome : 'Sistema'}</td>
                             <td>${c.forma_pagamento}</td>
                             <td>R$ ${parseFloat(c.valor || 0).toFixed(2)}</td>
                             <td>${c.status || 'ativo'}</td>
@@ -546,6 +686,8 @@ function openModal(id) {
     }
 
     populateSelects();
+    popularSelectsAtendentes();
+
     if (id === 'modalAtendimento') {
         toggleValorAvulso();
         renderCheckinAdicionais();
@@ -560,7 +702,7 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// TABELA DE PRECIFICAÇÃO DE ADICIONAIS (RF11)
+// TABELA DE PRECIFICAÇÃO DE ADICIONAIS
 async function carregarTabelaPrecosAdicionais() {
     const container = document.getElementById('tabelaPrecosAdicionaisContainer');
     if (!container) return;
@@ -604,7 +746,7 @@ async function salvarPrecosAdicionais() {
     }
 }
 
-// RENDERIZAR E CALCULAR VENDAS AVULSAS DE ADICIONAIS (RF12)
+// VENDAS AVULSAS DE ADICIONAIS
 function renderVendaAdicionaisLista() {
     const container = document.getElementById('vendaAdicionaisListaContainer');
     if (!container) return;
@@ -641,8 +783,14 @@ async function salvarVendaAdicionalAvulso() {
         if (!client) return;
 
         const petId = parseInt(document.getElementById('selectPetAdicional').value);
+        const atendenteId = document.getElementById('selectAtendenteVendaAdicional').value;
         const checkboxes = document.querySelectorAll('.chk-venda-adicional:checked');
         const forma = document.getElementById('pagamentoAdicionalAvulso').value;
+
+        if (!atendenteId) {
+            alert('Selecione o atendente responsável pela venda.');
+            return;
+        }
 
         if (checkboxes.length === 0) {
             alert('Selecione ao menos um serviço adicional.');
@@ -659,14 +807,14 @@ async function salvarVendaAdicionalAvulso() {
         const petObj = cadastros.find(p => p.id === petId);
         const desc = `Serviços Adicionais (${nomes.join(', ')}) - ${petObj ? petObj.nome : ''}`;
 
-        const { data: lancData, error: errLanc } = await client
+        const { error: errLanc } = await client
             .from('caixa_lancamentos')
             .insert([{
                 descricao: desc,
                 forma_pagamento: forma,
-                valor: total
-            }])
-            .select();
+                valor: total,
+                atendente_id: parseInt(atendenteId)
+            }]);
 
         if (errLanc) {
             alert('Erro ao lançar no caixa: ' + errLanc.message);
@@ -681,7 +829,7 @@ async function salvarVendaAdicionalAvulso() {
     }
 }
 
-// ADICIONAIS NO CHECK-IN (RF13)
+// CHECK-IN COM ADICIONAIS E ATENDENTE
 function renderCheckinAdicionais() {
     const container = document.getElementById('checkinAdicionaisContainer');
     if (!container) return;
@@ -753,7 +901,7 @@ async function salvarCadastro(e) {
     }
 }
 
-// 5. SALVAR CHECK-IN COM SUPORTE A ADICIONAIS
+// SALVAR CHECK-IN COM VÍNCULO DE ATENDENTE
 async function salvarCheckin() {
     if (!validarCaixaAberto()) return;
 
@@ -762,12 +910,20 @@ async function salvarCheckin() {
         if (!client) return;
 
         const petSelect = document.getElementById('selectPetCheckin');
+        const atendenteSelect = document.getElementById('selectAtendenteCheckin');
+
         if (!petSelect || !petSelect.value) {
             alert('Selecione um pet para realizar o check-in.');
             return;
         }
 
+        if (!atendenteSelect || !atendenteSelect.value) {
+            alert('Selecione o atendente responsável pelo check-in.');
+            return;
+        }
+
         const petId = parseInt(petSelect.value);
+        const atendenteId = parseInt(atendenteSelect.value);
         const tipo = document.getElementById('selectTipoCobranca').value;
         const servico = document.getElementById('selectServico').value;
         const selectEntregaElem = document.getElementById('selectTipoEntrega');
@@ -813,7 +969,8 @@ async function salvarCheckin() {
                     .insert([{
                         descricao: `Adicionais de Pacote (${listaAdicionais.map(a => a.nome).join(', ')}) - ${petObj ? petObj.nome : ''}`,
                         forma_pagamento: "PIX",
-                        valor: valorTotalAdicionais
+                        valor: valorTotalAdicionais,
+                        atendente_id: atendenteId
                     }]);
             }
         } else {
@@ -826,7 +983,8 @@ async function salvarCheckin() {
                 .insert([{
                     descricao: `Atendimento Avulso ${listaAdicionais.length > 0 ? '+ Adicionais' : ''} - ${petObj ? petObj.nome : ''}`,
                     forma_pagamento: pagtoInput ? pagtoInput.value : "PIX",
-                    valor: totalComAdicionais
+                    valor: totalComAdicionais,
+                    atendente_id: atendenteId
                 }]);
         }
 
@@ -839,7 +997,8 @@ async function salvarCheckin() {
                 tipo_entrega: tipoEntrega,
                 status: 'em_andamento',
                 valor: valor + valorTotalAdicionais,
-                servicos_adicionais: listaAdicionais
+                servicos_adicionais: listaAdicionais,
+                atendente_checkin_id: atendenteId
             }]);
 
         if (errAtend) {
@@ -849,7 +1008,6 @@ async function salvarCheckin() {
 
         closeModal('modalAtendimento');
         alert('Check-in realizado com sucesso!');
-
         await carregarDadosAtendimentos();
 
     } catch (e) {
@@ -865,9 +1023,16 @@ async function salvarVendaPacote() {
         if (!client) return;
 
         const petId = parseInt(document.getElementById('selectPetPacote').value);
+        const atendenteId = document.getElementById('selectAtendenteVendaPacote').value;
         const qtd = parseInt(document.getElementById('qtdBanhosPacote').value);
         const valor = parseFloat(document.getElementById('valorPacote').value);
         const forma = document.getElementById('pagamentoPacote').value;
+
+        if (!atendenteId) {
+            alert('Selecione o atendente vendedor.');
+            return;
+        }
+
         const petObj = cadastros.find(p => p.id === petId);
 
         const dataHoje = new Date();
@@ -889,7 +1054,8 @@ async function salvarVendaPacote() {
             .insert([{
                 descricao: `Venda Pacote (${qtd} Banhos) - ${petObj ? petObj.nome : ''}`,
                 forma_pagamento: forma,
-                valor: valor
+                valor: valor,
+                atendente_id: parseInt(atendenteId)
             }]);
 
         closeModal('modalPacote');
@@ -965,7 +1131,7 @@ async function confirmarAberturaCaixa() {
     }
 }
 
-// CONFIRMAR SANGRIA DE CAIXA (RF15)
+// CONFIRMAR SANGRIA DE CAIXA
 async function confirmarSangriaCaixa() {
     if (!validarPermissaoAdmin()) return;
     if (!caixaAtualSessao) {
@@ -1025,7 +1191,7 @@ async function confirmarSangriaCaixa() {
     }
 }
 
-// CONFIRMAR FECHAMENTO CEGO DE CAIXA (RF15)
+// CONFIRMAR FECHAMENTO CEGO DE CAIXA
 async function confirmarFechamentoCaixa() {
     try {
         if (!caixaAtualSessao) {
@@ -1079,7 +1245,7 @@ async function confirmarFechamentoCaixa() {
     }
 }
 
-// CHECAR SESSÃO DE USUÁRIO AO CARREGAR
+// CHECAR SESSÃO DE USUÁRIO
 function verificarSessaoUsuario() {
     const sessaoSalva = sessionStorage.getItem('petz_usuario');
     const modal = document.getElementById('modalLogin');
@@ -1135,7 +1301,7 @@ async function realizarLogin(e) {
     }
 }
 
-// LOGOUT DO SISTEMA
+// LOGOUT
 function fazerLogout() {
     if (confirm('Deseja realmente sair do sistema?')) {
         sessionStorage.removeItem('petz_usuario');
@@ -1144,7 +1310,7 @@ function fazerLogout() {
     }
 }
 
-// APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA (RF09)
+// APLICAR PERMISSÕES
 function aplicarPermissoesPerfil() {
     if (!usuarioLogado) return;
 
@@ -1176,7 +1342,6 @@ function aplicarPermissoesPerfil() {
     });
 }
 
-// AUXILIAR DE SEGURANÇA PARA AÇÕES CRÍTICAS
 function validarPermissaoAdmin() {
     if (!usuarioLogado || usuarioLogado.perfil !== 'admin') {
         alert('Acesso Negado: Esta operação requer privilégios de Administrador.');
@@ -1185,7 +1350,7 @@ function validarPermissaoAdmin() {
     return true;
 }
 
-// CARREGAR HISTÓRICO DE CAIXAS (RF14)
+// HISTÓRICO DE CAIXAS
 async function carregarHistoricoCaixas() {
     const container = document.getElementById('historicoCaixasContainer');
     if (!container) return;
@@ -1245,7 +1410,7 @@ async function carregarHistoricoCaixas() {
     }
 }
 
-// INICIALIZAÇÃO ÚNICA DO SISTEMA
+// INICIALIZAÇÃO
 window.addEventListener('DOMContentLoaded', () => {
     verificarSessaoUsuario();
     carregarDadosAtendimentos();

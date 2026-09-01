@@ -63,7 +63,7 @@
         <button class="nav-btn active" onclick="switchTab('atendimentos', this)"><i class="fa-solid fa-paw"></i>
             Atendimentos & Pets</button>
         <button class="nav-btn" onclick="switchTab('cadastros', this)"><i class="fa-solid fa-address-book"></i>
-            Cadastros & Tabela de Preços</button>
+            Cadastros & Equipe</button>
         <button class="nav-btn" onclick="switchTab('caixa', this)"><i class="fa-solid fa-cash-register"></i> Caixa
             Diário</button>
     </nav>
@@ -108,47 +108,66 @@
             </div>
         </section>
 
-        <!-- SEÇÃO 2: CADASTROS E PRECIFICAÇÃO DE SERVIÇOS -->
+        <!-- SEÇÃO 2: CADASTROS, ATENDENTES E PRECIFICAÇÃO -->
         <section id="sec-cadastros" class="tab-content">
             <div class="grid-2col">
-                <!-- FORMULÁRIO DE CADASTRO INTEGRADO -->
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
-                    </div>
-                    <form id="formCadastro" onsubmit="salvarCadastro(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Nome do Tutor *</label>
-                                <input type="text" id="cadTutorNome" class="form-control" required
-                                    placeholder="Ex: João Silva">
-                            </div>
-                            <div class="form-group">
-                                <label>WhatsApp / Telefone *</label>
-                                <input type="text" id="cadTutorFone" class="form-control" required
-                                    placeholder="(61) 98888-8888">
-                            </div>
-                            <div class="form-group">
-                                <label>Nome do Pet *</label>
-                                <input type="text" id="cadPetNome" class="form-control" required placeholder="Ex: Thor">
-                            </div>
-                            <div class="form-group">
-                                <label>Raça e Porte *</label>
-                                <input type="text" id="cadPetRaca" class="form-control" required
-                                    placeholder="Ex: Poodle / Médio">
-                            </div>
-                            <div class="form-group full-width">
-                                <label>Observações Fixas / Alergias</label>
-                                <textarea id="cadPetObs" class="form-control" rows="2"
-                                    placeholder="Ex: Alérgico a xampu com perfume, agressivo com outros cães."></textarea>
-                            </div>
+                <!-- COLUNA DA ESQUERDA: CADASTRO DE TUTOR/PET E GESTÃO DE ATENDENTES -->
+                <div>
+                    <!-- FORMULÁRIO DE CADASTRO INTEGRADO -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
                         </div>
-                        <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i
-                                class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
-                    </form>
+                        <form id="formCadastro" onsubmit="salvarCadastro(event)">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Nome do Tutor *</label>
+                                    <input type="text" id="cadTutorNome" class="form-control" required
+                                        placeholder="Ex: João Silva">
+                                </div>
+                                <div class="form-group">
+                                    <label>WhatsApp / Telefone *</label>
+                                    <input type="text" id="cadTutorFone" class="form-control" required
+                                        placeholder="(61) 98888-8888">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nome do Pet *</label>
+                                    <input type="text" id="cadPetNome" class="form-control" required
+                                        placeholder="Ex: Thor">
+                                </div>
+                                <div class="form-group">
+                                    <label>Raça e Porte *</label>
+                                    <input type="text" id="cadPetRaca" class="form-control" required
+                                        placeholder="Ex: Poodle / Médio">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Observações Fixas / Alergias</label>
+                                    <textarea id="cadPetObs" class="form-control" rows="2"
+                                        placeholder="Ex: Alérgico a xampu com perfume, agressivo com outros cães."></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-yellow" style="margin-top:15px;"><i
+                                    class="fa-solid fa-save"></i> Cadastrar Tutor & Pet</button>
+                        </form>
+                    </div>
+
+                    <!-- PAINEL DE GESTÃO DE ATENDENTES -->
+                    <div class="panel" style="margin-top: 15px;">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fa-solid fa-user-gear"></i> Equipe de Atendentes</div>
+                        </div>
+                        <form id="formCadastroAtendente" onsubmit="salvarAtendente(event)"
+                            style="display: flex; gap: 10px; margin-bottom: 15px;">
+                            <input type="text" id="cadAtendenteNome" class="form-control" required
+                                placeholder="Nome do novo atendente/tosador">
+                            <button type="submit" class="btn btn-purple btn-sm" style="white-space: nowrap;"><i
+                                    class="fa-solid fa-plus"></i> Cadastrar</button>
+                        </form>
+                        <div id="listaAtendentesContainer" style="max-height: 180px; overflow-y: auto;"></div>
+                    </div>
                 </div>
 
-                <!-- PAINEL DE PRECIFICAÇÃO DE SERVIÇOS ADICIONAIS -->
+                <!-- COLUNA DA DIREITA: PRECIFICAÇÃO DE SERVIÇOS ADICIONAIS -->
                 <div class="panel">
                     <div class="panel-header">
                         <div class="panel-title"><i class="fa-solid fa-tags"></i> Tabela de Preços de Adicionais</div>
@@ -207,7 +226,7 @@
                     </div>
                 </div>
 
-                <!-- PAINEL DE LANÇAMENTOS DO DIA COM EXPORTAÇÃO (RF17) -->
+                <!-- PAINEL DE LANÇAMENTOS DO DIA COM EXPORTAÇÃO -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
                     <div class="panel-title">
                         <i class="fa-solid fa-receipt"></i> Histórico de Lançamentos de Hoje
@@ -235,8 +254,12 @@
                 <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalAtendimento')"></i>
             </div>
             <div class="form-group">
-                <label>Selecione o Pet / Tutor</label>
-                <select class="form-control" id="selectPetCheckin"></select>
+                <label>Selecione o Pet / Tutor *</label>
+                <select class="form-control" id="selectPetCheckin" required></select>
+            </div>
+            <div class="form-group">
+                <label>Atendente Responsável pelo Check-in *</label>
+                <select class="form-control" id="selectAtendenteCheckin" required></select>
             </div>
             <div class="form-group">
                 <label>Tipo de Cobrança do Banho/Serviço Principal</label>
@@ -287,6 +310,26 @@
         </div>
     </div>
 
+    <!-- MODAL: CHECK-OUT DE ATENDIMENTO -->
+    <div class="modal-overlay" id="modalCheckout">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Dar Check-out / Entrega do Pet</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalCheckout')"></i>
+            </div>
+            <input type="hidden" id="checkoutAtendimentoId">
+            <div class="form-group">
+                <label>Atendente Responsável pela Entrega *</label>
+                <select class="form-control" id="selectAtendenteCheckout" required></select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalCheckout')">Cancelar</button>
+                <button class="btn btn-purple btn-sm" onclick="confirmarCheckoutAtendimento()">Confirmar
+                    Check-out</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: VENDA RÁPIDA DE SERVIÇOS ADICIONAIS -->
     <div class="modal-overlay" id="modalServicoAdicional">
         <div class="modal">
@@ -295,8 +338,12 @@
                 <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalServicoAdicional')"></i>
             </div>
             <div class="form-group">
-                <label>Selecione o Pet / Tutor</label>
-                <select class="form-control" id="selectPetAdicional"></select>
+                <label>Selecione o Pet / Tutor *</label>
+                <select class="form-control" id="selectPetAdicional" required></select>
+            </div>
+            <div class="form-group">
+                <label>Atendente Vendedor *</label>
+                <select class="form-control" id="selectAtendenteVendaAdicional" required></select>
             </div>
             <div class="form-group">
                 <label>Selecione os Serviços Adicionais</label>
@@ -334,8 +381,12 @@
                 <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalPacote')"></i>
             </div>
             <div class="form-group">
-                <label>Selecione o Pet / Tutor</label>
-                <select class="form-control" id="selectPetPacote"></select>
+                <label>Selecione o Pet / Tutor *</label>
+                <select class="form-control" id="selectPetPacote" required></select>
+            </div>
+            <div class="form-group">
+                <label>Atendente Vendedor *</label>
+                <select class="form-control" id="selectAtendenteVendaPacote" required></select>
             </div>
             <div class="form-group">
                 <label>Quantidade de Banhos / Serviços</label>
@@ -378,7 +429,7 @@
         </div>
     </div>
 
-    <!-- MODAL: SANGRIA DE CAIXA (RF15) -->
+    <!-- MODAL: SANGRIA DE CAIXA -->
     <div class="modal-overlay" id="modalSangriaCaixa">
         <div class="modal">
             <div class="modal-header">
