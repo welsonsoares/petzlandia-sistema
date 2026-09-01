@@ -593,7 +593,7 @@ async function carregarCaixa() {
             query = query.lte('data_lancamento', `${dtFim}T23:59:59`);
         }
         if (formaPagto && formaPagto !== 'todos') {
-            query = query.eq('forma_pagamento', formaPagto);
+            query = query.ilike('forma_pagamento', `%${formaPagto}%`);
         }
 
         const { data, error } = await query;
@@ -603,6 +603,19 @@ async function carregarCaixa() {
     } catch (e) {
         console.error('Erro ao carregar caixa (RF17):', e);
     }
+}
+
+// LIMPAR FILTROS DE PESQUISA DO CAIXA
+function limparFiltrosCaixa() {
+    const elInicio = document.getElementById('filtroDataInicio');
+    const elFim = document.getElementById('filtroDataFim');
+    const elForma = document.getElementById('filtroFormaPagto');
+
+    if (elInicio) elInicio.value = '';
+    if (elFim) elFim.value = '';
+    if (elForma) elForma.value = 'todos';
+
+    carregarCaixa();
 }
 
 // RENDERIZAR CAIXA E CALCULAR SOMAS
@@ -625,7 +638,7 @@ function renderCaixa() {
 
         if (!isCancelado) {
             total += v;
-            if (c.forma_pagamento === 'PIX') pix += v;
+            if ((c.forma_pagamento || '').toUpperCase().includes('PIX')) pix += v;
             else outros += v;
         }
 
@@ -704,7 +717,7 @@ function exportarCaixaCSV() {
         return;
     }
 
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // Byte Order Mark para compatibilidade com Excel
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
     csvContent += "ID;Data/Hora;Descricao;Forma Pagamento;Atendente;Valor (R$);Status\n";
 
     caixaLancamentos.forEach(c => {
@@ -747,8 +760,8 @@ function imprimirRelatorioCaixa() {
             } else {
                 totalGeral += v;
                 const forma = (c.forma_pagamento || '').toLowerCase();
-                if (forma === 'pix') pix += v;
-                else if (forma === 'dinheiro') dinheiro += v;
+                if (forma.includes('pix')) pix += v;
+                else if (forma.includes('dinheiro')) dinheiro += v;
                 else cartao += v;
             }
         }
@@ -1422,7 +1435,7 @@ async function confirmarFechamentoCaixa() {
 
         let totalDinheiroVendas = 0;
         caixaLancamentos.forEach(c => {
-            if ((c.forma_pagamento || '').toLowerCase() === 'dinheiro' && c.status !== 'cancelado') {
+            if ((c.forma_pagamento || '').toLowerCase().includes('dinheiro') && c.status !== 'cancelado') {
                 totalDinheiroVendas += parseFloat(c.valor || 0);
             }
         });

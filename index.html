@@ -267,12 +267,15 @@
                                 <option value="todos">Todas</option>
                                 <option value="PIX">PIX</option>
                                 <option value="Dinheiro">Dinheiro</option>
-                                <option value="Cartão">Cartão</option>
+                                <option value="Cartão">Cartão de Crédito/Débito</option>
                             </select>
                         </div>
                         <div class="form-group" style="display: flex; align-items: flex-end; gap: 5px;">
                             <button class="btn btn-sm btn-purple" onclick="carregarCaixa()" style="width: 100%;">
                                 <i class="fa-solid fa-magnifying-glass"></i> Filtrar
+                            </button>
+                            <button class="btn btn-sm btn-gray" onclick="limparFiltrosCaixa()" title="Limpar Filtros">
+                                <i class="fa-solid fa-rotate-left"></i>
                             </button>
                         </div>
                     </div>
