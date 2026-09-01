@@ -106,27 +106,16 @@ async function carregarAtendentes() {
         const client = getSupabase();
         if (!client) return;
 
-        // Busca tanto da tabela de atendentes quanto de usuários
-        const { data: dataAtend } = await client.from('atendentes').select('*').eq('ativo', true).order('nome');
-        const { data: dataUser } = await client.from('usuarios').select('id, nome, perfil, email').order('nome');
+        const { data: dataUser, error } = await client
+            .from('usuarios')
+            .select('*')
+            .order('nome');
 
-        let listaUnificada = [];
-        if (dataAtend) {
-            dataAtend.forEach(a => listaUnificada.push({ id: a.id, nome: a.nome, perfil: 'atendente' }));
+        if (!error && dataUser) {
+            atendentes = dataUser.filter(u => u.ativo !== false);
+            popularSelectsAtendentes();
+            renderListaAtendentes(dataUser);
         }
-
-        if (dataUser) {
-            dataUser.forEach(u => {
-                if (!listaUnificada.some(a => a.nome.toLowerCase() === u.nome.toLowerCase())) {
-                    listaUnificada.push({ id: u.id, nome: u.nome, perfil: u.perfil });
-                }
-            });
-        }
-
-        atendentes = listaUnificada;
-        popularSelectsAtendentes();
-        renderListaAtendentes();
-
     } catch (e) {
         console.error('Erro ao carregar atendentes/usuários:', e);
     }
@@ -156,7 +145,6 @@ function popularSelectsAtendentes() {
                 el.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
             });
 
-            // Se encontrou o atendente correspondente ao usuário logado, seleciona automaticamente
             if (idAtendenteEncontrado) {
                 el.value = idAtendenteEncontrado;
             }
@@ -183,17 +171,15 @@ async function salvarUsuarioAtendente(e) {
         const client = getSupabase();
         if (!client) return;
 
-        // 1. Inserir na tabela de usuários para login
         const { error: errUser } = await client
             .from('usuarios')
-            .insert([{ nome, email, senha, perfil }]);
+            .insert([{ nome, email, senha, perfil, ativo: true }]);
 
         if (errUser) {
             alert('Erro ao cadastrar Usuário: ' + errUser.message);
             return;
         }
 
-        // 2. Inserir na tabela de atendentes para vínculo nas operações
         await client.from('atendentes').insert([{ nome, ativo: true }]);
 
         document.getElementById('formCadastroAtendente').reset();
@@ -205,23 +191,148 @@ async function salvarUsuarioAtendente(e) {
     }
 }
 
-// RENDERIZAR LISTA DE ATENDENTES NA ABA CADASTROS
-function renderListaAtendentes() {
+// RENDERIZAR LISTA DE USUÁRIOS COM BOTÕES DE EDITAR E INATIVAR/ATIVAR
+function renderListaAtendentes(todosUsuarios) {
     const container = document.getElementById('listaAtendentesContainer');
-    if (!container) return;
+    if (!container || !todosUsuarios) return;
 
     container.innerHTML = '';
-    atendentes.forEach(a => {
-        const isAdm = a.perfil === 'admin';
+    const isAdmin = usuarioLogado && usuarioLogado.perfil === 'admin';
+
+    todosUsuarios.forEach(u => {
+        const isAdm = u.perfil === 'admin';
+        const isAtivo = u.ativo !== false;
+
         container.innerHTML += `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 12px;">
-                <span><i class="fa-solid ${isAdm ? 'fa-user-shield' : 'fa-user-check'}" style="color:var(--purple-main);"></i> ${a.nome}</span>
-                <span class="badge ${isAdm ? 'badge-pacote' : 'badge-avulso'}" style="background:${isAdm ? '#f3e5f5' : '#e8f5e9'}; color:${isAdm ? '#6a1b9a' : '#2e7d32'}; font-size:10px;">
-                    ${isAdm ? 'Administrador' : 'Atendente'}
-                </span>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 12px; ${!isAtivo ? 'opacity: 0.55; background: #f9f9f9;' : ''}">
+                <div>
+                    <strong><i class="fa-solid ${isAdm ? 'fa-user-shield' : 'fa-user-check'}" style="color:var(--purple-main);"></i> ${u.nome}</strong> 
+                    <small style="color:#777;">(${u.email})</small><br>
+                    <span class="badge ${isAdm ? 'badge-pacote' : 'badge-avulso'}" style="background:${isAdm ? '#f3e5f5' : '#e8f5e9'}; color:${isAdm ? '#6a1b9a' : '#2e7d32'}; font-size:9px;">
+                        ${isAdm ? 'Administrador' : 'Atendente'}
+                    </span>
+                    <span class="badge" style="background:${isAtivo ? '#e8f5e9' : '#ffebee'}; color:${isAtivo ? '#2e7d32' : '#c62828'}; font-size:9px;">
+                        ${isAtivo ? 'Ativo' : 'Inativo'}
+                    </span>
+                </div>
+                ${isAdmin ? `
+                    <div style="display:flex; gap: 4px;">
+                        <button class="btn btn-sm btn-yellow" onclick="abrirModalEditarUsuario(${u.id})" title="Editar Usuário" style="padding: 3px 7px; font-size: 10px;">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-sm ${isAtivo ? 'btn-red' : 'btn-green'}" onclick="alternarStatusUsuario(${u.id}, ${isAtivo})" title="${isAtivo ? 'Inativar Usuário' : 'Ativar Usuário'}" style="padding: 3px 7px; font-size: 10px;">
+                            <i class="fa-solid ${isAtivo ? 'fa-user-xmark' : 'fa-user-check'}"></i>
+                        </button>
+                    </div>
+                ` : ''}
             </div>
         `;
     });
+}
+
+// ABRIR MODAL E PREENCHER DADOS DO USUÁRIO
+async function abrirModalEditarUsuario(idUsuario) {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('usuarios')
+            .select('*')
+            .eq('id', idUsuario)
+            .single();
+
+        if (error || !data) {
+            alert('Erro ao carregar dados do usuário.');
+            return;
+        }
+
+        document.getElementById('editUsuarioId').value = data.id;
+        document.getElementById('editUsuarioNome').value = data.nome;
+        document.getElementById('editUsuarioEmail').value = data.email;
+        document.getElementById('editUsuarioSenha').value = '';
+        document.getElementById('editUsuarioPerfil').value = data.perfil;
+
+        openModal('modalEditarUsuario');
+    } catch (e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+// SALVAR ALTERAÇÕES DO USUÁRIO
+async function salvarEdicaoUsuario() {
+    if (!validarPermissaoAdmin()) return;
+
+    const id = document.getElementById('editUsuarioId').value;
+    const nome = document.getElementById('editUsuarioNome').value.trim();
+    const email = document.getElementById('editUsuarioEmail').value.trim();
+    const senha = document.getElementById('editUsuarioSenha').value.trim();
+    const perfil = document.getElementById('editUsuarioPerfil').value;
+
+    if (!nome || !email) {
+        alert('Nome e E-mail são obrigatórios.');
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        let dadosAtualizacao = { nome, email, perfil };
+        if (senha) {
+            dadosAtualizacao.senha = senha;
+        }
+
+        const { error: errUser } = await client
+            .from('usuarios')
+            .update(dadosAtualizacao)
+            .eq('id', id);
+
+        if (errUser) {
+            alert('Erro ao atualizar usuário: ' + errUser.message);
+            return;
+        }
+
+        await client.from('atendentes').update({ nome }).eq('nome', nome);
+
+        closeModal('modalEditarUsuario');
+        alert('Usuário atualizado com sucesso!');
+        await carregarAtendentes();
+
+    } catch (e) {
+        alert('Erro ao salvar alterações: ' + e.message);
+    }
+}
+
+// INATIVAR OU REATIVAR USUÁRIO / ATENDENTE
+async function alternarStatusUsuario(idUsuario, statusAtualAtivo) {
+    if (!validarPermissaoAdmin()) return;
+
+    const acao = statusAtualAtivo ? 'INATIVAR' : 'ATIVAR';
+    if (!confirm(`Tem certeza que deseja ${acao} este usuário?\n${statusAtualAtivo ? 'O usuário não conseguirá mais realizar login no sistema.' : 'O usuário voltará a ter acesso ao sistema.'}`)) {
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client
+            .from('usuarios')
+            .update({ ativo: !statusAtualAtivo })
+            .eq('id', idUsuario);
+
+        if (error) {
+            alert(`Erro ao ${acao.toLowerCase()} usuário: ` + error.message);
+            return;
+        }
+
+        alert(`Usuário ${statusAtualAtivo ? 'inativado' : 'ativado'} com sucesso!`);
+        await carregarAtendentes();
+
+    } catch (e) {
+        alert('Erro ao alterar status: ' + e.message);
+    }
 }
 
 // CARREGAR CATÁLOGO DE SERVIÇOS ADICIONAIS
@@ -1132,12 +1243,10 @@ async function checarStatusCaixa() {
         if (!error && data && data.length > 0) {
             caixaAtualSessao = data[0];
             if (btnAbrir) btnAbrir.style.display = 'none';
-            // Apenas administradores veem botões de fechar caixa e sangria
             if (btnFechar) btnFechar.style.display = isAdmin ? 'inline-block' : 'none';
             if (btnSangria) btnSangria.style.display = isAdmin ? 'inline-block' : 'none';
         } else {
             caixaAtualSessao = null;
-            // Apenas administradores veem o botão de abrir caixa
             if (btnAbrir) btnAbrir.style.display = isAdmin ? 'inline-block' : 'none';
             if (btnFechar) btnFechar.style.display = 'none';
             if (btnSangria) btnSangria.style.display = 'none';
@@ -1377,7 +1486,6 @@ function aplicarPermissoesPerfil() {
         badgeRole.style.background = isAdmin ? '#6a1b9a' : '#2e7d32';
     }
 
-    // Botões e seções exclusivas de Admin na aba de cadastros
     const btnSalvarTabelaPrecos = document.querySelector('button[onclick="salvarPrecosAdicionais()"]');
     if (btnSalvarTabelaPrecos) {
         btnSalvarTabelaPrecos.style.display = isAdmin ? 'inline-block' : 'none';

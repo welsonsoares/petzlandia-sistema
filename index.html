@@ -187,7 +187,11 @@
                                 style="margin-top: 10px; width: 100%;"><i class="fa-solid fa-user-check"></i> Cadastrar
                                 Usuário / Atendente</button>
                         </form>
-                        <div id="listaAtendentesContainer" style="max-height: 180px; overflow-y: auto;"></div>
+                        <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                            <small style="color: #666; font-weight: 600;">Usuários Cadastrados:</small>
+                            <div id="listaAtendentesContainer"
+                                style="max-height: 220px; overflow-y: auto; margin-top: 5px;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -431,6 +435,40 @@
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalPacote')">Cancelar</button>
                 <button class="btn btn-yellow btn-sm" onclick="salvarVendaPacote()">Confirmar Venda</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDITAR USUÁRIO -->
+    <div class="modal-overlay" id="modalEditarUsuario">
+        <div class="modal" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3>Editar Usuário / Atendente</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalEditarUsuario')"></i>
+            </div>
+            <input type="hidden" id="editUsuarioId">
+            <div class="form-group">
+                <label>Nome Completo *</label>
+                <input type="text" id="editUsuarioNome" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>E-mail de Login *</label>
+                <input type="email" id="editUsuarioEmail" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Nova Senha (deixe em branco para manter a atual)</label>
+                <input type="password" id="editUsuarioSenha" class="form-control" placeholder="******">
+            </div>
+            <div class="form-group">
+                <label>Perfil de Acesso *</label>
+                <select id="editUsuarioPerfil" class="form-control" required>
+                    <option value="atendente">Atendente (Vendas & Operação)</option>
+                    <option value="admin">Administrador (Acesso Total)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalEditarUsuario')">Cancelar</button>
+                <button class="btn btn-purple btn-sm" onclick="salvarEdicaoUsuario()">Salvar Alterações</button>
             </div>
         </div>
     </div>
