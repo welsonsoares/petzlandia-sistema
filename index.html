@@ -210,11 +210,11 @@
             </div>
         </section>
 
-        <!-- SEÇÃO 3: FLUXO DE CAIXA DIÁRIO -->
+        <!-- SEÇÃO 3: FLUXO DE CAIXA DIÁRIO & RELATÓRIOS (RF17) -->
         <section id="sec-caixa" class="tab-content">
             <div class="panel">
                 <div class="panel-header">
-                    <div class="panel-title"><i class="fa-solid fa-cash-register"></i> Controle de Caixa</div>
+                    <div class="panel-title"><i class="fa-solid fa-cash-register"></i> Controle de Caixa & Vendas</div>
                     <div style="display: flex; gap: 6px;">
                         <button class="btn btn-green btn-sm" id="btnAbrirCaixa" onclick="openModal('modalAbrirCaixa')">
                             <i class="fa-solid fa-lock-open"></i> Abrir Caixa
@@ -229,6 +229,8 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- CARDS DE MÉTRICAS -->
                 <div class="caixa-summary-cards" style="margin-top: 15px;">
                     <div class="card-metric">
                         <span>Total Faturado</span>
@@ -244,20 +246,42 @@
                     </div>
                 </div>
 
-                <!-- HISTÓRICO DE CAIXAS ANTERIORES -->
-                <div class="panel" style="margin-top: 20px;">
-                    <div class="panel-header">
-                        <div class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Caixas
-                            Anteriores</div>
+                <!-- PAINEL DE RELATÓRIOS E FILTROS (RF17) -->
+                <div class="panel" style="margin-top: 20px; background: #fafafa; border: 1px solid #eee;">
+                    <div class="panel-title" style="font-size: 13px; margin-bottom: 10px;">
+                        <i class="fa-solid fa-filter"></i> RF17 — Filtro de Relatório de Vendas
                     </div>
-                    <div id="historicoCaixasContainer" style="max-height: 250px; overflow-y: auto; margin-top: 10px;">
+                    <div class="form-grid"
+                        style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
+                        <div class="form-group">
+                            <label>Data Início</label>
+                            <input type="date" id="filtroDataInicio" class="form-control" style="font-size:12px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Data Fim</label>
+                            <input type="date" id="filtroDataFim" class="form-control" style="font-size:12px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Forma Pagamento</label>
+                            <select id="filtroFormaPagto" class="form-control" style="font-size:12px;">
+                                <option value="todos">Todas</option>
+                                <option value="PIX">PIX</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartão">Cartão</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end; gap: 5px;">
+                            <button class="btn btn-sm btn-purple" onclick="carregarCaixa()" style="width: 100%;">
+                                <i class="fa-solid fa-magnifying-glass"></i> Filtrar
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- PAINEL DE LANÇAMENTOS DO DIA COM EXPORTAÇÃO -->
+                <!-- HISTÓRICO DE LANÇAMENTOS COM EXPORTAÇÃO (RF17) -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
                     <div class="panel-title">
-                        <i class="fa-solid fa-receipt"></i> Histórico de Lançamentos de Hoje
+                        <i class="fa-solid fa-receipt"></i> Lançamentos & Vendas Registradas
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-sm btn-purple" onclick="exportarCaixaCSV()">
@@ -269,6 +293,16 @@
                     </div>
                 </div>
                 <div class="service-list" id="caixaLancamentos" style="margin-top:10px;"></div>
+
+                <!-- HISTÓRICO DE SESSÕES DE CAIXA -->
+                <div class="panel" style="margin-top: 20px;">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> Histórico de Fechamentos
+                            de Caixa</div>
+                    </div>
+                    <div id="historicoCaixasContainer" style="max-height: 250px; overflow-y: auto; margin-top: 10px;">
+                    </div>
+                </div>
             </div>
         </section>
 

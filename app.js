@@ -567,12 +567,13 @@ function renderPacotes() {
     });
 }
 
+// RF17 - CARREGAR LANÇAMENTOS DE CAIXA COM SUPORTE A FILTROS POR DATA E FORMA DE PAGAMENTO
 async function carregarCaixa() {
     try {
         const client = getSupabase();
         if (!client) return;
 
-        const { data, error } = await client
+        let query = client
             .from('caixa_lancamentos')
             .select(`
                 *,
@@ -580,14 +581,31 @@ async function carregarCaixa() {
             `)
             .order('data_lancamento', { ascending: false });
 
+        // Aplicação de Filtro por Período (RF17)
+        const dtInicio = document.getElementById('filtroDataInicio')?.value;
+        const dtFim = document.getElementById('filtroDataFim')?.value;
+        const formaPagto = document.getElementById('filtroFormaPagto')?.value;
+
+        if (dtInicio) {
+            query = query.gte('data_lancamento', `${dtInicio}T00:00:00`);
+        }
+        if (dtFim) {
+            query = query.lte('data_lancamento', `${dtFim}T23:59:59`);
+        }
+        if (formaPagto && formaPagto !== 'todos') {
+            query = query.eq('forma_pagamento', formaPagto);
+        }
+
+        const { data, error } = await query;
+
         if (!error) caixaLancamentos = data || [];
         renderCaixa();
     } catch (e) {
-        console.error('Erro ao carregar caixa:', e);
+        console.error('Erro ao carregar caixa (RF17):', e);
     }
 }
 
-// RENDERIZAR CAIXA COM RESTRIÇÃO E GOVERNANÇA DE PERFIS
+// RENDERIZAR CAIXA E CALCULAR SOMAS
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
@@ -595,6 +613,10 @@ function renderCaixa() {
 
     let total = 0, pix = 0, outros = 0;
     const isAdmin = usuarioLogado && usuarioLogado.perfil === 'admin';
+
+    if (caixaLancamentos.length === 0) {
+        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum lançamento encontrado para os filtros selecionados.</p>`;
+    }
 
     caixaLancamentos.forEach(c => {
         const v = parseFloat(c.valor || 0);
@@ -616,7 +638,11 @@ function renderCaixa() {
             <div class="service-item" style="${isCancelado ? 'opacity: 0.55; background: #f5f5f5;' : ''}">
                 <div>
                     <strong>${c.descricao} ${isCancelado ? '<small style="color: #d32f2f; font-weight:bold;">(CANCELADO)</small>' : ''}</strong>
-                    <p style="font-size:11px; color:#666;">Forma de Pagamento: ${c.forma_pagamento} <span style="color: #6a1b9a; font-weight: 500;">• Op: ${nomeAtend}</span></p>
+                    <p style="font-size:11px; color:#666;">
+                        Forma de Pagamento: <strong>${c.forma_pagamento}</strong> 
+                        <span style="color: #6a1b9a; font-weight: 500;">• Operador: ${nomeAtend}</span>
+                        ${c.data_lancamento ? ` • ${new Date(c.data_lancamento).toLocaleString('pt-BR')}` : ''}
+                    </p>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <strong style="color:${corValor}; ${isCancelado ? 'text-decoration: line-through;' : ''}">
@@ -671,21 +697,24 @@ async function estornarLancamentoCaixa(idLancamento) {
     }
 }
 
-// EXPORTAR CAIXA CSV
+// RF17 - EXPORTAÇÃO DE RELATÓRIO EM CSV
 function exportarCaixaCSV() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há lançamentos no caixa para exportar.');
         return;
     }
 
-    let csvContent = "data:text/csv;charset=utf-8,ID;Descricao;Forma Pagamento;Atendente;Valor;Status;Data\n";
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // Byte Order Mark para compatibilidade com Excel
+    csvContent += "ID;Data/Hora;Descricao;Forma Pagamento;Atendente;Valor (R$);Status\n";
 
     caixaLancamentos.forEach(c => {
         const dataFormatada = c.data_lancamento
             ? new Date(c.data_lancamento).toLocaleString('pt-BR')
             : '';
         const nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema';
-        const linha = `${c.id};"${c.descricao}";${c.forma_pagamento};"${nomeAtend}";${parseFloat(c.valor || 0).toFixed(2)};${c.status || 'ativo'};${dataFormatada}`;
+        const valorFormatado = parseFloat(c.valor || 0).toFixed(2).replace('.', ',');
+
+        const linha = `${c.id};"${dataFormatada}";"${c.descricao}";${c.forma_pagamento};"${nomeAtend}";${valorFormatado};${c.status || 'ativo'}`;
         csvContent += linha + "\n";
     });
 
@@ -694,64 +723,90 @@ function exportarCaixaCSV() {
     link.setAttribute("href", encodedUri);
 
     const dataHoje = new Date().toISOString().split('T')[0];
-    link.setAttribute("download", `fechamento_caixa_${dataHoje}.csv`);
+    link.setAttribute("download", `relatorio_vendas_petzlandia_${dataHoje}.csv`);
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 }
 
-// IMPRIMIR RELATÓRIO DO CAIXA
+// RF17 - IMPRESSÃO DE RELATÓRIO SINTÉTICO E DETALHADO DE FECHAMENTO / VENDAS
 function imprimirRelatorioCaixa() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há dados de caixa para gerar relatório.');
         return;
     }
 
-    let total = 0, pix = 0, dinheiro = 0, cartao = 0;
+    let totalGeral = 0, pix = 0, dinheiro = 0, cartao = 0, sangrias = 0;
 
     caixaLancamentos.forEach(c => {
         if (c.status !== 'cancelado') {
             const v = parseFloat(c.valor || 0);
-            total += v;
-            const forma = (c.forma_pagamento || '').toLowerCase();
-            if (forma === 'pix') pix += v;
-            else if (forma === 'dinheiro') dinheiro += v;
-            else cartao += v;
+            if (v < 0) {
+                sangrias += Math.abs(v);
+            } else {
+                totalGeral += v;
+                const forma = (c.forma_pagamento || '').toLowerCase();
+                if (forma === 'pix') pix += v;
+                else if (forma === 'dinheiro') dinheiro += v;
+                else cartao += v;
+            }
         }
     });
 
-    const janelaImpressao = window.open('', '', 'width=800,height=600');
+    const janelaImpressao = window.open('', '', 'width=850,height=650');
     janelaImpressao.document.write(`
         <html>
         <head>
-            <title>Relatório de Fechamento de Caixa - Petz Lândia</title>
+            <title>Relatório de Fechamento e Vendas - Petz Lândia</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-                h2 { color: #6a1b9a; margin-bottom: 5px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-                th { background-color: #f0eaf4; }
-                .resumo { margin-top: 15px; background: #fafafa; padding: 10px; border-radius: 5px; }
-                .cancelado { text-decoration: line-through; color: #888; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #333; }
+                .header { text-align: center; border-bottom: 2px solid #6a1b9a; padding-bottom: 10px; margin-bottom: 15px; }
+                .header h2 { color: #6a1b9a; margin: 0; }
+                .header p { margin: 3px 0; font-size: 12px; color: #666; }
+                .resumo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; }
+                .card { background: #f8f5fa; border: 1px solid #e1d5e7; padding: 10px; border-radius: 6px; text-align: center; }
+                .card span { font-size: 11px; color: #666; display: block; }
+                .card strong { font-size: 15px; color: #6a1b9a; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+                th, td { border: 1px solid #ddd; padding: 7px 10px; text-align: left; }
+                th { background-color: #6a1b9a; color: #fff; }
+                tr:nth-child(even) { background-color: #fcfcfc; }
+                .cancelado { text-decoration: line-through; color: #999; }
+                .sangria { color: #d32f2f; font-weight: bold; }
+                .footer { margin-top: 25px; text-align: center; font-size: 10px; color: #888; border-top: 1px solid #eee; padding-top: 10px; }
             </style>
         </head>
         <body>
-            <h2>Petz Lândia - Extrato de Caixa</h2>
-            <p>Data do Relatório: ${new Date().toLocaleString('pt-BR')}</p>
-            
-            <div class="resumo">
-                <strong>Resumo do Faturamento:</strong><br>
-                • Total Faturado: R$ ${total.toFixed(2)}<br>
-                • Total em PIX: R$ ${pix.toFixed(2)}<br>
-                • Total em Dinheiro: R$ ${dinheiro.toFixed(2)}<br>
-                • Total em Cartão: R$ ${cartao.toFixed(2)}
+            <div class="header">
+                <h2>Petz Lândia - Relatório de Fechamento & Vendas (RF17)</h2>
+                <p>Emissão: ${new Date().toLocaleString('pt-BR')} | Operador: ${usuarioLogado ? usuarioLogado.nome : 'Sistema'}</p>
+            </div>
+
+            <div class="resumo-grid">
+                <div class="card">
+                    <span>Total de Vendas</span>
+                    <strong>R$ ${totalGeral.toFixed(2)}</strong>
+                </div>
+                <div class="card">
+                    <span>Total em PIX</span>
+                    <strong>R$ ${pix.toFixed(2)}</strong>
+                </div>
+                <div class="card">
+                    <span>Cartão / Dinheiro</span>
+                    <strong>R$ ${(dinheiro + cartao).toFixed(2)}</strong>
+                </div>
+                <div class="card">
+                    <span>Total Sangrias</span>
+                    <strong style="color:#d32f2f;">R$ ${sangrias.toFixed(2)}</strong>
+                </div>
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th>Descrição</th>
+                        <th>Data/Hora</th>
+                        <th>Descrição Lançamento</th>
                         <th>Atendente</th>
                         <th>Pagamento</th>
                         <th>Valor (R$)</th>
@@ -761,15 +816,23 @@ function imprimirRelatorioCaixa() {
                 <tbody>
                     ${caixaLancamentos.map(c => `
                         <tr class="${c.status === 'cancelado' ? 'cancelado' : ''}">
+                            <td>${c.data_lancamento ? new Date(c.data_lancamento).toLocaleString('pt-BR') : '-'}</td>
                             <td>${c.descricao}</td>
                             <td>${c.atendentes ? c.atendentes.nome : 'Sistema'}</td>
                             <td>${c.forma_pagamento}</td>
-                            <td>R$ ${parseFloat(c.valor || 0).toFixed(2)}</td>
+                            <td class="${parseFloat(c.valor) < 0 ? 'sangria' : ''}">
+                                R$ ${parseFloat(c.valor || 0).toFixed(2)}
+                            </td>
                             <td>${c.status || 'ativo'}</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
+
+            <div class="footer">
+                Documento gerado automaticamente pelo Sistema Petz Lândia - Controle de Vendas e Fechamento de Caixa.
+            </div>
+
             <script>
                 window.onload = function() { window.print(); window.close(); }
             </script>
