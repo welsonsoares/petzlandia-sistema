@@ -30,7 +30,7 @@ let usuarioLogado = null;
 // TRAVA DE SEGURANÇA: VALIDAR SE O CAIXA ESTÁ ABERTO
 function validarCaixaAberto() {
     if (!caixaAtualSessao) {
-        alert('Atenção: O caixa do dia está FECHADO!\nPor favor, abra o caixa na aba "Caixa Diário" para realizar vendas ou check-ins.');
+        alert('Atenção: O caixa do dia está FECHADO!\nPor favor, peça a um Administrador para abrir o caixa na aba "Caixa Diário" para realizar vendas ou check-ins.');
         return false;
     }
     return true;
@@ -122,7 +122,7 @@ async function carregarAtendentes() {
     }
 }
 
-// POPULAR SELECTS DE ATENDENTES NOS MODAIS
+// POPULAR SELECTS DE ATENDENTES NOS MODAIS E PREENCHER COM USUÁRIO LOGADO AUTOMATICAMENTE
 function popularSelectsAtendentes() {
     const ids = [
         'selectAtendenteCheckin',
@@ -135,16 +135,31 @@ function popularSelectsAtendentes() {
         const el = document.getElementById(id);
         if (el) {
             el.innerHTML = '<option value="">Selecione o Atendente...</option>';
+            let idAtendenteEncontrado = null;
+
             atendentes.forEach(a => {
-                el.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+                const isSelected = usuarioLogado && (
+                    a.nome.toLowerCase() === usuarioLogado.nome.toLowerCase() ||
+                    (usuarioLogado.atendente_id && a.id === usuarioLogado.atendente_id)
+                );
+                if (isSelected) idAtendenteEncontrado = a.id;
+
+                el.innerHTML += `<option value="${a.id}" ${isSelected ? 'selected' : ''}>${a.nome}</option>`;
             });
+
+            // Se o usuário logado está na lista de atendentes, pré-seleciona automaticamente
+            if (idAtendenteEncontrado) {
+                el.value = idAtendenteEncontrado;
+            }
         }
     });
 }
 
-// CADASTRAR ATENDENTE
+// CADASTRAR ATENDENTE (ADMIN)
 async function salvarAtendente(e) {
     if (e) e.preventDefault();
+    if (!validarPermissaoAdmin()) return;
+
     const inputNome = document.getElementById('cadAtendenteNome');
     const nome = inputNome.value.trim();
 
@@ -169,7 +184,7 @@ async function salvarAtendente(e) {
     }
 }
 
-// RENDERIZAR LISTA DE ATENDENTES
+// RENDERIZAR LISTA DE ATENDENTES NA ABA CADASTROS
 function renderListaAtendentes() {
     const container = document.getElementById('listaAtendentesContainer');
     if (!container) return;
@@ -328,7 +343,7 @@ async function alterarStatusAtendimento(id, novoStatus) {
     }
 }
 
-// ABRIR MODAL DE CHECK-OUT COM ATENDENTE
+// ABRIR MODAL DE CHECK-OUT COM ATENDENTE LOGADO PRÉ-SELECIONADO AUTOMATICAMENTE
 function abrirModalCheckout(atendimentoId) {
     document.getElementById('checkoutAtendimentoId').value = atendimentoId;
     openModal('modalCheckout');
@@ -437,7 +452,7 @@ async function carregarCaixa() {
     }
 }
 
-// RENDERIZAR CAIXA COM BOTÃO DE ESTORNO E ATENDENTE
+// RENDERIZAR CAIXA COM RESTRICAO DE PERFIL (SOMENTE ADMIN ESTORNA OU MANIPULA AÇÕES SENSÍVEIS)
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
@@ -460,7 +475,7 @@ function renderCaixa() {
         let corValor = isSangria ? '#d32f2f' : 'var(--green-badge)';
         if (isCancelado) corValor = '#9e9e9e';
 
-        let nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema/Admin';
+        let nomeAtend = c.atendentes ? c.atendentes.nome : (usuarioLogado ? usuarioLogado.nome : 'Sistema');
 
         list.innerHTML += `
             <div class="service-item" style="${isCancelado ? 'opacity: 0.55; background: #f5f5f5;' : ''}">
@@ -487,7 +502,7 @@ function renderCaixa() {
     document.getElementById('caixaOutros').innerText = `R$ ${outros.toFixed(2)}`;
 }
 
-// ESTORNAR LANÇAMENTO
+// ESTORNAR LANÇAMENTO (EXCLUSIVO ADMIN)
 async function estornarLancamentoCaixa(idLancamento) {
     if (!validarPermissaoAdmin()) return;
 
@@ -534,7 +549,7 @@ function exportarCaixaCSV() {
         const dataFormatada = c.data_lancamento
             ? new Date(c.data_lancamento).toLocaleString('pt-BR')
             : '';
-        const nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema/Admin';
+        const nomeAtend = c.atendentes ? c.atendentes.nome : 'Sistema';
         const linha = `${c.id};"${c.descricao}";${c.forma_pagamento};"${nomeAtend}";${parseFloat(c.valor || 0).toFixed(2)};${c.status || 'ativo'};${dataFormatada}`;
         csvContent += linha + "\n";
     });
@@ -675,13 +690,10 @@ function toggleValorAvulso() {
     }
 }
 
-// CONTROLAR ABERTURA DE MODAIS COM BLOQUEIO DE CAIXA FECHADO
+// CONTROLAR ABERTURA DE MODAIS COM TRAVA DE CAIXA FECHADO
 function openModal(id) {
     if ((id === 'modalAtendimento' || id === 'modalPacote' || id === 'modalServicoAdicional') && !caixaAtualSessao) {
-        if (confirm('O caixa precisa estar ABERTO para realizar vendas ou check-ins.\nDeseja abrir o caixa agora?')) {
-            switchTab('caixa');
-            document.getElementById('modalAbrirCaixa').style.display = 'flex';
-        }
+        alert('O caixa do dia precisa estar ABERTO para realizar vendas ou check-ins.\nContate um Administrador.');
         return;
     }
 
@@ -724,6 +736,8 @@ async function carregarTabelaPrecosAdicionais() {
 }
 
 async function salvarPrecosAdicionais() {
+    if (!validarPermissaoAdmin()) return;
+
     try {
         const client = getSupabase();
         if (!client) return;
@@ -829,7 +843,7 @@ async function salvarVendaAdicionalAvulso() {
     }
 }
 
-// CHECK-IN COM ADICIONAIS E ATENDENTE
+// CHECK-IN COM ADICIONAIS E ATENDENTE AUTOMÁTICO
 function renderCheckinAdicionais() {
     const container = document.getElementById('checkinAdicionaisContainer');
     if (!container) return;
@@ -1072,7 +1086,7 @@ function filterServices(tipo, btn) {
     renderAtendimentos(tipo);
 }
 
-// VERIFICAR STATUS DO CAIXA NO BANCO
+// VERIFICAR STATUS DO CAIXA NO BANCO E APLICAR RESTRIÇÕES DE PERFIL DE ACESSO
 async function checarStatusCaixa() {
     try {
         const client = getSupabase();
@@ -1089,14 +1103,18 @@ async function checarStatusCaixa() {
         const btnFechar = document.getElementById('btnFecharCaixa');
         const btnSangria = document.getElementById('btnSangriaCaixa');
 
+        const isAdmin = usuarioLogado && usuarioLogado.perfil === 'admin';
+
         if (!error && data && data.length > 0) {
             caixaAtualSessao = data[0];
             if (btnAbrir) btnAbrir.style.display = 'none';
-            if (btnFechar) btnFechar.style.display = 'inline-block';
-            if (btnSangria) btnSangria.style.display = 'inline-block';
+            // Apenas administradores veem botões de fechar caixa e sangria
+            if (btnFechar) btnFechar.style.display = isAdmin ? 'inline-block' : 'none';
+            if (btnSangria) btnSangria.style.display = isAdmin ? 'inline-block' : 'none';
         } else {
             caixaAtualSessao = null;
-            if (btnAbrir) btnAbrir.style.display = 'inline-block';
+            // Apenas administradores veem o botão de abrir caixa
+            if (btnAbrir) btnAbrir.style.display = isAdmin ? 'inline-block' : 'none';
             if (btnFechar) btnFechar.style.display = 'none';
             if (btnSangria) btnSangria.style.display = 'none';
         }
@@ -1105,8 +1123,10 @@ async function checarStatusCaixa() {
     }
 }
 
-// CONFIRMAR ABERTURA DE CAIXA
+// CONFIRMAR ABERTURA DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarAberturaCaixa() {
+    if (!validarPermissaoAdmin()) return;
+
     try {
         const client = getSupabase();
         const valorFundo = parseFloat(document.getElementById('valorFundoInicial').value) || 0;
@@ -1131,7 +1151,7 @@ async function confirmarAberturaCaixa() {
     }
 }
 
-// CONFIRMAR SANGRIA DE CAIXA
+// CONFIRMAR SANGRIA DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarSangriaCaixa() {
     if (!validarPermissaoAdmin()) return;
     if (!caixaAtualSessao) {
@@ -1191,8 +1211,10 @@ async function confirmarSangriaCaixa() {
     }
 }
 
-// CONFIRMAR FECHAMENTO CEGO DE CAIXA
+// CONFIRMAR FECHAMENTO CEGO DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarFechamentoCaixa() {
+    if (!validarPermissaoAdmin()) return;
+
     try {
         if (!caixaAtualSessao) {
             alert('Nenhum caixa aberto no momento.');
@@ -1294,6 +1316,7 @@ async function realizarLogin(e) {
 
         document.getElementById('formLogin').reset();
         aplicarPermissoesPerfil();
+        await checarStatusCaixa();
         alert(`Bem-vindo(a), ${usuarioLogado.nome}!`);
 
     } catch (err) {
@@ -1310,7 +1333,7 @@ function fazerLogout() {
     }
 }
 
-// APLICAR PERMISSÕES
+// APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA E VISIBILIDADE DE BOTÕES
 function aplicarPermissoesPerfil() {
     if (!usuarioLogado) return;
 
@@ -1323,23 +1346,30 @@ function aplicarPermissoesPerfil() {
     if (btnLogout) btnLogout.style.display = 'inline-block';
     if (userName) userName.innerText = usuarioLogado.nome;
 
+    const isAdmin = usuarioLogado.perfil === 'admin';
+
     if (badgeRole) {
-        const isAdmin = usuarioLogado.perfil === 'admin';
-        badgeRole.innerText = isAdmin ? 'Administrador' : 'Funcionário';
+        badgeRole.innerText = isAdmin ? 'Administrador' : 'Atendente';
         badgeRole.style.background = isAdmin ? '#6a1b9a' : '#2e7d32';
     }
 
-    const isAdmin = usuarioLogado.perfil === 'admin';
-
+    // Botões e seções exclusivas de Admin na aba de cadastros
     const btnSalvarTabelaPrecos = document.querySelector('button[onclick="salvarPrecosAdicionais()"]');
     if (btnSalvarTabelaPrecos) {
         btnSalvarTabelaPrecos.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+
+    const panelAtendentesForm = document.getElementById('formCadastroAtendente');
+    if (panelAtendentesForm) {
+        panelAtendentesForm.style.display = isAdmin ? 'flex' : 'none';
     }
 
     const inputsPreco = document.querySelectorAll('.input-preco-adicional');
     inputsPreco.forEach(input => {
         input.disabled = !isAdmin;
     });
+
+    checarStatusCaixa();
 }
 
 function validarPermissaoAdmin() {
