@@ -108,12 +108,12 @@
             </div>
         </section>
 
-        <!-- SEÇÃO 2: CADASTROS, ATENDENTES E PRECIFICAÇÃO -->
+        <!-- SEÇÃO 2: CADASTROS, ATENDENTES/USUÁRIOS E PRECIFICAÇÃO -->
         <section id="sec-cadastros" class="tab-content">
             <div class="grid-2col">
-                <!-- COLUNA DA ESQUERDA: CADASTRO DE TUTOR/PET E GESTÃO DE ATENDENTES -->
+                <!-- COLUNA DA ESQUERDA: CADASTRO DE TUTOR/PET E CADASTRO DE USUÁRIOS/ATENDENTES -->
                 <div>
-                    <!-- FORMULÁRIO DE CADASTRO INTEGRADO -->
+                    <!-- FORMULÁRIO DE CADASTRO INTEGRADO TUTOR/PET -->
                     <div class="panel">
                         <div class="panel-header">
                             <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
@@ -151,17 +151,41 @@
                         </form>
                     </div>
 
-                    <!-- PAINEL DE GESTÃO DE ATENDENTES -->
+                    <!-- PAINEL DE GESTÃO E CADASTRO DE USUÁRIOS / ATENDENTES -->
                     <div class="panel" style="margin-top: 15px;">
                         <div class="panel-header">
-                            <div class="panel-title"><i class="fa-solid fa-user-gear"></i> Equipe de Atendentes</div>
+                            <div class="panel-title"><i class="fa-solid fa-user-gear"></i> Equipe & Acessos de Usuários
+                            </div>
                         </div>
-                        <form id="formCadastroAtendente" onsubmit="salvarAtendente(event)"
-                            style="display: flex; gap: 10px; margin-bottom: 15px;">
-                            <input type="text" id="cadAtendenteNome" class="form-control" required
-                                placeholder="Nome do novo atendente/tosador">
-                            <button type="submit" class="btn btn-purple btn-sm" style="white-space: nowrap;"><i
-                                    class="fa-solid fa-plus"></i> Cadastrar</button>
+                        <form id="formCadastroAtendente" onsubmit="salvarUsuarioAtendente(event)"
+                            style="margin-bottom: 15px;">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Nome Completo *</label>
+                                    <input type="text" id="cadUsuarioNome" class="form-control" required
+                                        placeholder="Ex: Ana Souza">
+                                </div>
+                                <div class="form-group">
+                                    <label>E-mail de Login *</label>
+                                    <input type="email" id="cadUsuarioEmail" class="form-control" required
+                                        placeholder="ana@petzlandia.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Senha de Acesso *</label>
+                                    <input type="password" id="cadUsuarioSenha" class="form-control" required
+                                        placeholder="******">
+                                </div>
+                                <div class="form-group">
+                                    <label>Perfil de Acesso *</label>
+                                    <select id="cadUsuarioPerfil" class="form-control" required>
+                                        <option value="atendente">Atendente (Vendas & Operação)</option>
+                                        <option value="admin">Administrador (Acesso Total)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-purple btn-sm"
+                                style="margin-top: 10px; width: 100%;"><i class="fa-solid fa-user-check"></i> Cadastrar
+                                Usuário / Atendente</button>
                         </form>
                         <div id="listaAtendentesContainer" style="max-height: 180px; overflow-y: auto;"></div>
                     </div>

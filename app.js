@@ -100,29 +100,39 @@ async function carregarDadosAtendimentos() {
     }
 }
 
-// CARREGAR CATÁLOGO DE ATENDENTES
+// CARREGAR CATÁLOGO DE ATENDENTES / USUÁRIOS
 async function carregarAtendentes() {
     try {
         const client = getSupabase();
         if (!client) return;
 
-        const { data, error } = await client
-            .from('atendentes')
-            .select('*')
-            .eq('ativo', true)
-            .order('nome');
+        // Busca tanto da tabela de atendentes quanto de usuários
+        const { data: dataAtend } = await client.from('atendentes').select('*').eq('ativo', true).order('nome');
+        const { data: dataUser } = await client.from('usuarios').select('id, nome, perfil, email').order('nome');
 
-        if (!error && data) {
-            atendentes = data;
-            popularSelectsAtendentes();
-            renderListaAtendentes();
+        let listaUnificada = [];
+        if (dataAtend) {
+            dataAtend.forEach(a => listaUnificada.push({ id: a.id, nome: a.nome, perfil: 'atendente' }));
         }
+
+        if (dataUser) {
+            dataUser.forEach(u => {
+                if (!listaUnificada.some(a => a.nome.toLowerCase() === u.nome.toLowerCase())) {
+                    listaUnificada.push({ id: u.id, nome: u.nome, perfil: u.perfil });
+                }
+            });
+        }
+
+        atendentes = listaUnificada;
+        popularSelectsAtendentes();
+        renderListaAtendentes();
+
     } catch (e) {
-        console.error('Erro ao carregar atendentes:', e);
+        console.error('Erro ao carregar atendentes/usuários:', e);
     }
 }
 
-// POPULAR SELECTS DE ATENDENTES NOS MODAIS E PREENCHER COM USUÁRIO LOGADO AUTOMATICAMENTE
+// POPULAR SELECTS DE ATENDENTES NOS MODAIS E PRÉ-SELEÇÃO AUTOMÁTICA DO USUÁRIO LOGADO
 function popularSelectsAtendentes() {
     const ids = [
         'selectAtendenteCheckin',
@@ -139,15 +149,14 @@ function popularSelectsAtendentes() {
 
             atendentes.forEach(a => {
                 const isSelected = usuarioLogado && (
-                    a.nome.toLowerCase() === usuarioLogado.nome.toLowerCase() ||
-                    (usuarioLogado.atendente_id && a.id === usuarioLogado.atendente_id)
+                    a.nome.toLowerCase().trim() === usuarioLogado.nome.toLowerCase().trim()
                 );
                 if (isSelected) idAtendenteEncontrado = a.id;
 
-                el.innerHTML += `<option value="${a.id}" ${isSelected ? 'selected' : ''}>${a.nome}</option>`;
+                el.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
             });
 
-            // Se o usuário logado está na lista de atendentes, pré-seleciona automaticamente
+            // Se encontrou o atendente correspondente ao usuário logado, seleciona automaticamente
             if (idAtendenteEncontrado) {
                 el.value = idAtendenteEncontrado;
             }
@@ -155,32 +164,44 @@ function popularSelectsAtendentes() {
     });
 }
 
-// CADASTRAR ATENDENTE (ADMIN)
-async function salvarAtendente(e) {
+// CADASTRAR NOVO USUÁRIO / ATENDENTE COM CREDENCIAIS DE ACESSO
+async function salvarUsuarioAtendente(e) {
     if (e) e.preventDefault();
     if (!validarPermissaoAdmin()) return;
 
-    const inputNome = document.getElementById('cadAtendenteNome');
-    const nome = inputNome.value.trim();
+    const nome = document.getElementById('cadUsuarioNome').value.trim();
+    const email = document.getElementById('cadUsuarioEmail').value.trim();
+    const senha = document.getElementById('cadUsuarioSenha').value.trim();
+    const perfil = document.getElementById('cadUsuarioPerfil').value;
 
-    if (!nome) return;
+    if (!nome || !email || !senha) {
+        alert('Por favor, preencha todos os campos obrigatórios.');
+        return;
+    }
 
     try {
         const client = getSupabase();
         if (!client) return;
 
-        const { error } = await client.from('atendentes').insert([{ nome: nome }]);
+        // 1. Inserir na tabela de usuários para login
+        const { error: errUser } = await client
+            .from('usuarios')
+            .insert([{ nome, email, senha, perfil }]);
 
-        if (error) {
-            alert('Erro ao cadastrar atendente: ' + error.message);
+        if (errUser) {
+            alert('Erro ao cadastrar Usuário: ' + errUser.message);
             return;
         }
 
-        inputNome.value = '';
-        alert('Atendente cadastrado com sucesso!');
+        // 2. Inserir na tabela de atendentes para vínculo nas operações
+        await client.from('atendentes').insert([{ nome, ativo: true }]);
+
+        document.getElementById('formCadastroAtendente').reset();
+        alert(`Usuário/Atendente ${nome} cadastrado com sucesso!`);
         await carregarAtendentes();
+
     } catch (e) {
-        alert('Erro: ' + e.message);
+        alert('Erro ao cadastrar: ' + e.message);
     }
 }
 
@@ -191,10 +212,13 @@ function renderListaAtendentes() {
 
     container.innerHTML = '';
     atendentes.forEach(a => {
+        const isAdm = a.perfil === 'admin';
         container.innerHTML += `
             <div style="display:flex; justify-content:space-between; align-items:center; padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 12px;">
-                <span><i class="fa-solid fa-user-check" style="color:var(--purple-main);"></i> ${a.nome}</span>
-                <span class="badge badge-pacote" style="background:#e8f5e9; color:#2e7d32;">Ativo</span>
+                <span><i class="fa-solid ${isAdm ? 'fa-user-shield' : 'fa-user-check'}" style="color:var(--purple-main);"></i> ${a.nome}</span>
+                <span class="badge ${isAdm ? 'badge-pacote' : 'badge-avulso'}" style="background:${isAdm ? '#f3e5f5' : '#e8f5e9'}; color:${isAdm ? '#6a1b9a' : '#2e7d32'}; font-size:10px;">
+                    ${isAdm ? 'Administrador' : 'Atendente'}
+                </span>
             </div>
         `;
     });
@@ -384,7 +408,7 @@ async function confirmarCheckoutAtendimento() {
     }
 }
 
-// 4. NOTIFICAÇÃO DINÂMICA VIA WHATSAPP (RF10)
+// 4. NOTIFICAÇÃO DINÂMICA VIA WHATSAPP
 function notificarWhatsapp(tutorNome, fone, petNome, tipoEntrega = 'retirada') {
     if (!fone) {
         alert('Telefone do tutor não cadastrado.');
@@ -452,7 +476,7 @@ async function carregarCaixa() {
     }
 }
 
-// RENDERIZAR CAIXA COM RESTRICAO DE PERFIL (SOMENTE ADMIN ESTORNA OU MANIPULA AÇÕES SENSÍVEIS)
+// RENDERIZAR CAIXA COM RESTRIÇÃO E GOVERNANÇA DE PERFIS
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
@@ -1361,7 +1385,7 @@ function aplicarPermissoesPerfil() {
 
     const panelAtendentesForm = document.getElementById('formCadastroAtendente');
     if (panelAtendentesForm) {
-        panelAtendentesForm.style.display = isAdmin ? 'flex' : 'none';
+        panelAtendentesForm.style.display = isAdmin ? 'block' : 'none';
     }
 
     const inputsPreco = document.querySelectorAll('.input-preco-adicional');
