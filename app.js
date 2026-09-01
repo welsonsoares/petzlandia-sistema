@@ -24,6 +24,7 @@ let atendimentos = [];
 let caixaLancamentos = [];
 let servicosAdicionais = [];
 let caixaAtualSessao = null;
+let usuarioLogado = null;
 
 // TRAVA DE SEGURANÇA: VALIDAR SE O CAIXA ESTÁ ABERTO
 function validarCaixaAberto() {
@@ -50,7 +51,10 @@ function switchTab(tabId, btnElement = null) {
 
     if (tabId === 'atendimentos') carregarDadosAtendimentos();
     if (tabId === 'cadastros') carregarTabelaPrecosAdicionais();
-    if (tabId === 'caixa') carregarCaixa();
+    if (tabId === 'caixa') {
+        carregarCaixa();
+        carregarHistoricoCaixas();
+    }
 }
 
 // 1. CARREGAR ATENDIMENTOS, PACOTES E ADICIONAIS DO SUPABASE
@@ -161,7 +165,6 @@ function renderAtendimentos(filter = 'todos') {
         const tipoEntrega = item.tipo_entrega || 'retirada';
         const textoEntrega = tipoEntrega === 'entrega' ? 'Delivery / Táxi Pet' : 'Retirada na Loja';
 
-        // Mudar visualização dos adicionais se houver
         let adicionaisTexto = '';
         if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
             adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => s.nome).join(', ')}</span>`;
@@ -613,7 +616,6 @@ async function salvarCheckin() {
         const tipoEntrega = selectEntregaElem ? selectEntregaElem.value : 'retirada';
         let valor = tipo === 'avulso' ? parseFloat(document.getElementById('valorAvulso').value) || 0 : 0;
 
-        // Capturar adicionais do check-in
         const chkAdicionais = document.querySelectorAll('.chk-checkin-adicional:checked');
         let listaAdicionais = [];
         let valorTotalAdicionais = 0;
@@ -646,7 +648,6 @@ async function salvarCheckin() {
                 .update({ quantidade_usada: novaQtd, status: statusNovo })
                 .eq('id', pkgData.id);
 
-            // Se tiver adicionais no pacote, lança o valor extra no caixa
             if (valorTotalAdicionais > 0) {
                 const petObj = cadastros.find(p => p.id === petId);
                 await client
@@ -855,26 +856,31 @@ async function confirmarFechamentoCaixa() {
     }
 }
 
-let usuarioLogado = null;
-
-// 1. CHECAR SESSÃO AO CARREGAR
+// CHECAR SESSÃO DE USUÁRIO AO CARREGAR
 function verificarSessaoUsuario() {
     const sessaoSalva = sessionStorage.getItem('petz_usuario');
+    const modal = document.getElementById('modalLogin');
+
     if (sessaoSalva) {
         usuarioLogado = JSON.parse(sessaoSalva);
+        if (modal) modal.style.display = 'none';
         aplicarPermissoesPerfil();
-        closeModal('modalLogin');
     } else {
-        document.getElementById('modalLogin').style.display = 'flex';
+        if (modal) modal.style.display = 'flex';
     }
 }
 
-// 2. REALIZAR LOGIN NO SUPABASE
+// REALIZAR LOGIN NO SUPABASE
 async function realizarLogin(e) {
     if (e) e.preventDefault();
 
-    const email = document.getElementById('loginEmail').value.trim();
-    const senha = document.getElementById('loginSenha').value.trim();
+    const emailInput = document.getElementById('loginEmail');
+    const senhaInput = document.getElementById('loginSenha');
+
+    if (!emailInput || !senhaInput) return;
+
+    const email = emailInput.value.trim();
+    const senha = senhaInput.value.trim();
 
     try {
         const client = getSupabase();
@@ -884,19 +890,20 @@ async function realizarLogin(e) {
             .from('usuarios')
             .select('*')
             .eq('email', email)
-            .eq('senha', senha)
-            .single();
+            .eq('senha', senha);
 
-        if (error || !data) {
+        if (error || !data || data.length === 0) {
             alert('E-mail ou senha inválidos!');
             return;
         }
 
-        usuarioLogado = data;
+        usuarioLogado = data[0];
         sessionStorage.setItem('petz_usuario', JSON.stringify(usuarioLogado));
 
+        const modal = document.getElementById('modalLogin');
+        if (modal) modal.style.display = 'none';
+
         document.getElementById('formLogin').reset();
-        closeModal('modalLogin');
         aplicarPermissoesPerfil();
         alert(`Bem-vindo(a), ${usuarioLogado.nome}!`);
 
@@ -905,7 +912,7 @@ async function realizarLogin(e) {
     }
 }
 
-// 3. LOGOUT DO SISTEMA
+// LOGOUT DO SISTEMA
 function fazerLogout() {
     if (confirm('Deseja realmente sair do sistema?')) {
         sessionStorage.removeItem('petz_usuario');
@@ -914,22 +921,27 @@ function fazerLogout() {
     }
 }
 
-// 4. APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA (RF09)
+// APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA (RF09)
 function aplicarPermissoesPerfil() {
     if (!usuarioLogado) return;
 
-    // Atualiza o Header com infos do usuário
-    document.getElementById('userInfoDisplay').style.display = 'block';
-    document.getElementById('btnLogout').style.display = 'inline-block';
-    document.getElementById('userName').innerText = usuarioLogado.nome;
-
+    const displayInfo = document.getElementById('userInfoDisplay');
+    const btnLogout = document.getElementById('btnLogout');
+    const userName = document.getElementById('userName');
     const badgeRole = document.getElementById('userRoleBadge');
-    badgeRole.innerText = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Funcionário';
-    badgeRole.style.background = usuarioLogado.perfil === 'admin' ? '#6a1b9a' : '#2e7d32';
+
+    if (displayInfo) displayInfo.style.display = 'block';
+    if (btnLogout) btnLogout.style.display = 'inline-block';
+    if (userName) userName.innerText = usuarioLogado.nome;
+
+    if (badgeRole) {
+        const isAdmin = usuarioLogado.perfil === 'admin';
+        badgeRole.innerText = isAdmin ? 'Administrador' : 'Funcionário';
+        badgeRole.style.background = isAdmin ? '#6a1b9a' : '#2e7d32';
+    }
 
     const isAdmin = usuarioLogado.perfil === 'admin';
 
-    // Regras de Restrição para Funcionário
     const btnSalvarTabelaPrecos = document.querySelector('button[onclick="salvarPrecosAdicionais()"]');
     if (btnSalvarTabelaPrecos) {
         btnSalvarTabelaPrecos.style.display = isAdmin ? 'inline-block' : 'none';
@@ -950,13 +962,68 @@ function validarPermissaoAdmin() {
     return true;
 }
 
+// CARREGAR HISTÓRICO DE CAIXAS (RF14)
+async function carregarHistoricoCaixas() {
+    const container = document.getElementById('historicoCaixasContainer');
+    if (!container) return;
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('caixa_sessoes')
+            .select('*')
+            .order('data_abertura', { ascending: false })
+            .limit(10);
+
+        if (error) {
+            console.error('Erro ao buscar histórico de caixas:', error);
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            container.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum caixa encerrado até o momento.</p>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        data.forEach(sessao => {
+            const dataAbertura = new Date(sessao.data_abertura).toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const dataFechamento = sessao.data_fechamento ? new Date(sessao.data_fechamento).toLocaleDateString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Em Aberto';
+            const isAberto = sessao.status === 'aberto';
+            const diferenca = parseFloat(sessao.diferenca || 0);
+
+            let corDiferenca = '#666';
+            if (diferenca < 0) corDiferenca = '#d32f2f';
+            if (diferenca > 0) corDiferenca = '#2e7d32';
+
+            container.innerHTML += `
+                <div style="background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <strong>Abertura: ${dataAbertura}</strong>
+                        <span class="badge ${isAberto ? 'badge-pacote' : 'badge-avulso'}" style="background: ${isAberto ? '#e3f2fd' : '#f5f5f5'}; color: ${isAberto ? '#1976d2' : '#616161'};">
+                            ${isAberto ? 'Sessão Ativa' : 'Encerrado às ' + dataFechamento}
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; color: #555;">
+                        <div>Troco Inicial: <strong>R$ ${parseFloat(sessao.valor_inicial || 0).toFixed(2)}</strong></div>
+                        <div>Esperado Dinheiro: <strong>R$ ${parseFloat(sessao.valor_esperado || 0).toFixed(2)}</strong></div>
+                        <div>Informado Gaveta: <strong>R$ ${parseFloat(sessao.valor_final_informado || 0).toFixed(2)}</strong></div>
+                        <div>Diferença: <strong style="color: ${corDiferenca}">R$ ${diferenca.toFixed(2)}</strong></div>
+                    </div>
+                </div>
+            `;
+        });
+
+    } catch (e) {
+        console.error('Erro ao carregar histórico:', e);
+    }
+}
+
 // INICIALIZAÇÃO ÚNICA DO SISTEMA
 window.addEventListener('DOMContentLoaded', () => {
+    verificarSessaoUsuario();
     carregarDadosAtendimentos();
     checarStatusCaixa();
-    window.addEventListener('DOMContentLoaded', () => {
-        verificarSessaoUsuario();
-        carregarDadosAtendimentos();
-        checarStatusCaixa();
-    });
 });
