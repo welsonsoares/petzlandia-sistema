@@ -16,15 +16,48 @@
 <body>
 
     <!-- Cabeçalho -->
+    <!-- CÓDIGO DO HEADER ATUALIZADO -->
     <header>
         <div class="brand-container">
             <img src="logo.png" alt="Petz Lândia" class="brand-logo-img">
         </div>
-        <div class="user-nav">
-            <i class="fa-regular fa-bell"></i>
-            <i class="fa-solid fa-circle-user fa-lg"></i>
+        <div class="user-nav" style="display: flex; align-items: center; gap: 12px;">
+            <div id="userInfoDisplay" style="text-align: right; font-size: 12px; display: none;">
+                <strong id="userName">Usuário</strong><br>
+                <small id="userRoleBadge" class="badge badge-pacote"
+                    style="font-size: 9px; text-transform: uppercase;">Perfil</small>
+            </div>
+            <button id="btnLogout" class="btn btn-sm btn-gray" onclick="fazerLogout()" style="display: none;"
+                title="Sair do Sistema">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+            <i class="fa-solid fa-circle-user fa-xl" style="color: var(--purple-main);"></i>
         </div>
     </header>
+
+    <!-- MODAL DE LOGIN (BLOQUEIA O USO ATÉ AUTENTICAR) -->
+    <div class="modal-overlay" id="modalLogin" style="display: flex; background: rgba(0,0,0,0.85); z-index: 9999;">
+        <div class="modal" style="max-width: 380px; text-align: center;">
+            <div class="modal-header" style="justify-content: center;">
+                <h3 style="color: var(--purple-main);"><i class="fa-solid fa-shield-halved"></i> Petz Lândia - Acesso
+                </h3>
+            </div>
+            <form id="formLogin" onsubmit="realizarLogin(event)" style="margin-top: 15px;">
+                <div class="form-group" style="text-align: left;">
+                    <label>E-mail do Usuário</label>
+                    <input type="email" id="loginEmail" class="form-control" required
+                        placeholder="admin@petzlandia.com.br">
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label>Senha</label>
+                    <input type="password" id="loginSenha" class="form-control" required placeholder="******">
+                </div>
+                <button type="submit" class="btn btn-purple" style="width: 100%; margin-top: 10px; padding: 10px;">
+                    <i class="fa-solid fa-key"></i> Entrar no Sistema
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- Navegação Principal -->
     <nav class="main-nav">

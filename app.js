@@ -855,8 +855,108 @@ async function confirmarFechamentoCaixa() {
     }
 }
 
+let usuarioLogado = null;
+
+// 1. CHECAR SESSÃO AO CARREGAR
+function verificarSessaoUsuario() {
+    const sessaoSalva = sessionStorage.getItem('petz_usuario');
+    if (sessaoSalva) {
+        usuarioLogado = JSON.parse(sessaoSalva);
+        aplicarPermissoesPerfil();
+        closeModal('modalLogin');
+    } else {
+        document.getElementById('modalLogin').style.display = 'flex';
+    }
+}
+
+// 2. REALIZAR LOGIN NO SUPABASE
+async function realizarLogin(e) {
+    if (e) e.preventDefault();
+
+    const email = document.getElementById('loginEmail').value.trim();
+    const senha = document.getElementById('loginSenha').value.trim();
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('usuarios')
+            .select('*')
+            .eq('email', email)
+            .eq('senha', senha)
+            .single();
+
+        if (error || !data) {
+            alert('E-mail ou senha inválidos!');
+            return;
+        }
+
+        usuarioLogado = data;
+        sessionStorage.setItem('petz_usuario', JSON.stringify(usuarioLogado));
+
+        document.getElementById('formLogin').reset();
+        closeModal('modalLogin');
+        aplicarPermissoesPerfil();
+        alert(`Bem-vindo(a), ${usuarioLogado.nome}!`);
+
+    } catch (err) {
+        alert('Erro ao realizar login: ' + err.message);
+    }
+}
+
+// 3. LOGOUT DO SISTEMA
+function fazerLogout() {
+    if (confirm('Deseja realmente sair do sistema?')) {
+        sessionStorage.removeItem('petz_usuario');
+        usuarioLogado = null;
+        window.location.reload();
+    }
+}
+
+// 4. APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA (RF09)
+function aplicarPermissoesPerfil() {
+    if (!usuarioLogado) return;
+
+    // Atualiza o Header com infos do usuário
+    document.getElementById('userInfoDisplay').style.display = 'block';
+    document.getElementById('btnLogout').style.display = 'inline-block';
+    document.getElementById('userName').innerText = usuarioLogado.nome;
+
+    const badgeRole = document.getElementById('userRoleBadge');
+    badgeRole.innerText = usuarioLogado.perfil === 'admin' ? 'Administrador' : 'Funcionário';
+    badgeRole.style.background = usuarioLogado.perfil === 'admin' ? '#6a1b9a' : '#2e7d32';
+
+    const isAdmin = usuarioLogado.perfil === 'admin';
+
+    // Regras de Restrição para Funcionário
+    const btnSalvarTabelaPrecos = document.querySelector('button[onclick="salvarPrecosAdicionais()"]');
+    if (btnSalvarTabelaPrecos) {
+        btnSalvarTabelaPrecos.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+
+    const inputsPreco = document.querySelectorAll('.input-preco-adicional');
+    inputsPreco.forEach(input => {
+        input.disabled = !isAdmin;
+    });
+}
+
+// AUXILIAR DE SEGURANÇA PARA AÇÕES CRÍTICAS
+function validarPermissaoAdmin() {
+    if (!usuarioLogado || usuarioLogado.perfil !== 'admin') {
+        alert('Acesso Negado: Esta operação requer privilégios de Administrador.');
+        return false;
+    }
+    return true;
+}
+
 // INICIALIZAÇÃO ÚNICA DO SISTEMA
 window.addEventListener('DOMContentLoaded', () => {
     carregarDadosAtendimentos();
     checarStatusCaixa();
+    window.addEventListener('DOMContentLoaded', () => {
+        verificarSessaoUsuario();
+        carregarDadosAtendimentos();
+        checarStatusCaixa();
+    });
 });
