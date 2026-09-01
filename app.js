@@ -302,29 +302,45 @@ async function carregarCaixa() {
     }
 }
 
+// RENDERIZAR CAIXA COM BOTÃO DE ESTORNO PARA ADMIN (RF16)
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
     list.innerHTML = '';
 
     let total = 0, pix = 0, outros = 0;
+    const isAdmin = usuarioLogado && usuarioLogado.perfil === 'admin';
 
     caixaLancamentos.forEach(c => {
         const v = parseFloat(c.valor || 0);
-        total += v;
-        if (c.forma_pagamento === 'PIX') pix += v;
-        else outros += v;
-
+        const isCancelado = c.status === 'cancelado';
         const isSangria = v < 0;
-        const corValor = isSangria ? '#d32f2f' : 'var(--green-badge)';
+
+        if (!isCancelado) {
+            total += v;
+            if (c.forma_pagamento === 'PIX') pix += v;
+            else outros += v;
+        }
+
+        let corValor = isSangria ? '#d32f2f' : 'var(--green-badge)';
+        if (isCancelado) corValor = '#9e9e9e';
 
         list.innerHTML += `
-            <div class="service-item">
+            <div class="service-item" style="${isCancelado ? 'opacity: 0.55; background: #f5f5f5;' : ''}">
                 <div>
-                    <strong>${c.descricao}</strong>
+                    <strong>${c.descricao} ${isCancelado ? '<small style="color: #d32f2f; font-weight:bold;">(CANCELADO)</small>' : ''}</strong>
                     <p style="font-size:11px; color:#666;">Forma de Pagamento: ${c.forma_pagamento}</p>
                 </div>
-                <strong style="color:${corValor};">${isSangria ? '- R$ ' + Math.abs(v).toFixed(2) : '+ R$ ' + v.toFixed(2)}</strong>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <strong style="color:${corValor}; ${isCancelado ? 'text-decoration: line-through;' : ''}">
+                        ${isSangria ? '- R$ ' + Math.abs(v).toFixed(2) : '+ R$ ' + v.toFixed(2)}
+                    </strong>
+                    ${(!isCancelado && isAdmin) ? `
+                        <button class="btn btn-sm btn-red" onclick="estornarLancamentoCaixa(${c.id})" title="Cancelar / Estornar Lançamento" style="padding: 3px 8px; font-size: 10px;">
+                            <i class="fa-solid fa-ban"></i> Estornar
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         `;
     });
@@ -332,6 +348,40 @@ function renderCaixa() {
     document.getElementById('caixaTotal').innerText = `R$ ${total.toFixed(2)}`;
     document.getElementById('caixaPix').innerText = `R$ ${pix.toFixed(2)}`;
     document.getElementById('caixaOutros').innerText = `R$ ${outros.toFixed(2)}`;
+}
+
+// ESTORNAR / CANCELAR LANÇAMENTO DE CAIXA (RF16)
+async function estornarLancamentoCaixa(idLancamento) {
+    if (!validarPermissaoAdmin()) return;
+
+    if (!confirm('Tem certeza que deseja CANCELAR este lançamento do caixa?\nEsta ação será registrada no histórico de auditoria.')) {
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client
+            .from('caixa_lancamentos')
+            .update({
+                status: 'cancelado',
+                cancelado_por: usuarioLogado.nome,
+                cancelado_em: new Date().toISOString()
+            })
+            .eq('id', idLancamento);
+
+        if (error) {
+            alert('Erro ao estornar lançamento: ' + error.message);
+            return;
+        }
+
+        alert('Lançamento cancelado e estornado com sucesso!');
+        await carregarCaixa();
+
+    } catch (e) {
+        alert('Erro ao processar estorno: ' + e.message);
+    }
 }
 
 async function populateSelects() {
@@ -883,7 +933,7 @@ async function confirmarFechamentoCaixa() {
 
         let totalDinheiroVendas = 0;
         caixaLancamentos.forEach(c => {
-            if ((c.forma_pagamento || '').toLowerCase() === 'dinheiro') {
+            if ((c.forma_pagamento || '').toLowerCase() === 'dinheiro' && c.status !== 'cancelado') {
                 totalDinheiroVendas += parseFloat(c.valor || 0);
             }
         });
