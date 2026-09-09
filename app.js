@@ -670,9 +670,14 @@ function abrirModalCheckout(atendimentoId) {
 
 async function confirmarCheckoutAtendimento() {
     const id = document.getElementById('checkoutAtendimentoId').value;
-    const atendenteId = document.getElementById('selectAtendenteCheckout').value;
+    const atendenteSelect = document.getElementById('selectAtendenteCheckout');
 
-    if (!atendenteId) {
+    let usuarioSelectId = atendenteSelect ? parseInt(atendenteSelect.value) : null;
+    if ((!usuarioSelectId || isNaN(usuarioSelectId)) && usuarioLogado) {
+        usuarioSelectId = usuarioLogado.id;
+    }
+
+    if (!usuarioSelectId || isNaN(usuarioSelectId)) {
         alert('Selecione o atendente responsável pelo check-out.');
         return;
     }
@@ -681,11 +686,65 @@ async function confirmarCheckoutAtendimento() {
         const client = getSupabase();
         if (!client) return;
 
+        // 1. Obtém o nome do usuário selecionado na tabela 'usuarios'
+        const { data: usuarioData } = await client
+            .from('usuarios')
+            .select('nome')
+            .eq('id', usuarioSelectId)
+            .single();
+
+        const nomeAtendente = usuarioData ? usuarioData.nome : (usuarioLogado ? usuarioLogado.nome : '');
+
+        // 2. Busca o ID correspondente na tabela 'atendentes' pelo nome
+        let atendenteId = null;
+        if (nomeAtendente) {
+            const { data: atendenteMatch } = await client
+                .from('atendentes')
+                .select('id')
+                .ilike('nome', nomeAtendente.trim())
+                .limit(1);
+
+            if (atendenteMatch && atendenteMatch.length > 0) {
+                atendenteId = atendenteMatch[0].id;
+            }
+        }
+
+        // 3. Caso não encontre por nome, tenta usar o próprio ID do select se existir em 'atendentes'
+        if (!atendenteId) {
+            const { data: idDirectMatch } = await client
+                .from('atendentes')
+                .select('id')
+                .eq('id', usuarioSelectId)
+                .limit(1);
+
+            if (idDirectMatch && idDirectMatch.length > 0) {
+                atendenteId = idDirectMatch[0].id;
+            }
+        }
+
+        // 4. Se ainda não encontrar, seleciona o primeiro atendente ativo disponível
+        if (!atendenteId) {
+            const { data: primeiroAtendente } = await client
+                .from('atendentes')
+                .select('id')
+                .eq('ativo', true)
+                .limit(1);
+
+            if (primeiroAtendente && primeiroAtendente.length > 0) {
+                atendenteId = primeiroAtendente[0].id;
+            }
+        }
+
+        if (!atendenteId) {
+            alert('Erro: Nenhum atendente válido foi encontrado no banco de dados para realizar o Check-out.');
+            return;
+        }
+
         const { error } = await client
             .from('atendimentos')
             .update({
                 status: 'finalizado',
-                atendente_checkout_id: parseInt(atendenteId)
+                atendente_checkout_id: atendenteId
             })
             .eq('id', id);
 
@@ -700,53 +759,6 @@ async function confirmarCheckoutAtendimento() {
     } catch (e) {
         alert('Erro: ' + e.message);
     }
-}
-
-function notificarWhatsapp(tutorNome, fone, petNome, tipoEntrega = 'retirada') {
-    if (!fone) {
-        alert('Telefone do tutor não cadastrado.');
-        return;
-    }
-    const numLimpo = fone.replace(/\D/g, '');
-    let textoMensagem = '';
-
-    if (tipoEntrega === 'entrega') {
-        textoMensagem = `Olá ${tutorNome}! O pet ${petNome} já finalizou o serviço na Petz Lândia e nosso táxi pet já está se preparando para levá-lo de volta até você! 🚗🐾`;
-    } else {
-        textoMensagem = `Olá ${tutorNome}! O pet ${petNome} já finalizou o serviço na Petz Lândia e está prontinho esperando por você para ser buscado! 🐾`;
-    }
-
-    const msg = encodeURIComponent(textoMensagem);
-    window.open(`https://wa.me/55${numLimpo}?text=${msg}`, '_blank');
-}
-
-function renderPacotes() {
-    const list = document.getElementById('packageList');
-    if (!list) return;
-    list.innerHTML = '';
-
-    if (pacotes.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum pacote ativo.</p>`;
-        return;
-    }
-
-    pacotes.forEach(pkg => {
-        const restante = pkg.quantidade_total - pkg.quantidade_usada;
-        const pct = (pkg.quantidade_usada / pkg.quantidade_total) * 100;
-        const petNome = pkg.pets ? pkg.pets.nome : 'Pet';
-        const tutorNome = (pkg.pets && pkg.pets.tutores) ? pkg.pets.tutores.nome : 'Tutor';
-
-        list.innerHTML += `
-            <div class="pkg-card">
-                <div style="display:flex; justify-content:space-between; font-size:13px;">
-                    <strong>${escapeHtml(petNome)} <small>(${escapeHtml(tutorNome)})</small></strong>
-                    <span style="color:var(--purple-main); font-weight:600;">${restante} restantes</span>
-                </div>
-                <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-                <small style="font-size:10px; color:#777;">${pkg.quantidade_usada} de ${pkg.quantidade_total} banhos utilizados</small>
-            </div>
-        `;
-    });
 }
 
 async function carregarCaixa() {
