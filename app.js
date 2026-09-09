@@ -974,29 +974,39 @@ async function populateSelects() {
     const selAdicional = document.getElementById('selectPetAdicional');
 
     if (!selCheckin || !selPacote) return;
-    selCheckin.innerHTML = ''; selPacote.innerHTML = '';
-    if (selAdicional) selAdicional.innerHTML = '';
+    selCheckin.innerHTML = '<option value="">Selecione o Pet...</option>';
+    selPacote.innerHTML = '<option value="">Selecione o Pet...</option>';
+    if (selAdicional) selAdicional.innerHTML = '<option value="">Selecione o Pet...</option>';
 
     try {
         const client = getSupabase();
         if (!client) return;
 
+        // Busca pets trazendo os dados do tutor relacionado
         const { data, error } = await client
             .from('pets')
-            .select(`id, nome, tutores ( nome, telefone )`);
+            .select(`
+                id, 
+                nome, 
+                raca_porte,
+                tutores ( id, nome, telefone )
+            `)
+            .order('nome');
 
         if (!error && data) {
             cadastros = data;
             data.forEach(p => {
-                const tutorNome = p.tutores ? p.tutores.nome : '';
-                const opt = `<option value="${p.id}">${escapeHtml(p.nome)} (${escapeHtml(tutorNome)})</option>`;
+                const tutorNome = p.tutores ? p.tutores.nome : 'Sem Tutor';
+                const raca = p.raca_porte ? ` - ${p.raca_porte}` : '';
+                const opt = `<option value="${p.id}">${escapeHtml(p.nome)}${escapeHtml(raca)} (Tutor: ${escapeHtml(tutorNome)})</option>`;
+
                 selCheckin.innerHTML += opt;
                 selPacote.innerHTML += opt;
                 if (selAdicional) selAdicional.innerHTML += opt;
             });
         }
     } catch (e) {
-        console.error('Erro ao popular selects:', e);
+        console.error('Erro ao popular selects de pets:', e);
     }
 }
 
