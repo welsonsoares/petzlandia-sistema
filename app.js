@@ -225,21 +225,68 @@ async function salvarNovoPetTutorExistente() {
     }
 }
 
-// CONSULTAR E EXIBIR HISTÓRICO COMPLETO DO PET
+// ABRIR HISTÓRICO A PARTIR DO SELECT DA MODAL DE CHECK-IN
+function abrirHistoricoPetSelecionadoCheckin() {
+    const selPet = document.getElementById('selectPetCheckin');
+    if (!selPet || !selPet.value) {
+        alert('Por favor, selecione um pet primeiro para visualizar o histórico.');
+        return;
+    }
+
+    const petId = parseInt(selPet.value);
+    const petObj = cadastros.find(p => p.id === petId);
+    const petNome = petObj ? petObj.nome : 'Pet';
+
+    abrirHistoricoPet(petId, petNome);
+}
+
+// CONSULTAR E EXIBIR HISTÓRICO COMPLETO E OBSERVAÇÕES DO PET (DO PRIMEIRO AO ÚLTIMO ATENDIMENTO)
 async function abrirHistoricoPet(petId, petNome) {
     const container = document.getElementById('historicoPetConteudo');
     const titulo = document.getElementById('historicoPetTitulo');
     if (!container) return;
 
     titulo.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Histórico do Pet: <strong>${escapeHtml(petNome)}</strong>`;
-    container.innerHTML = '<p style="text-align:center; color:#888;">Carregando histórico...</p>';
+    container.innerHTML = '<p style="text-align:center; color:#888; padding:15px;">Carregando histórico e observações...</p>';
     openModal('modalHistoricoPet');
 
     try {
         const client = getSupabase();
         if (!client) return;
 
-        const { data, error } = await client
+        // 1. Busca os dados e observações fixas do Pet e Tutor
+        const { data: petData, error: errPet } = await client
+            .from('pets')
+            .select(`
+                id, nome, raca_porte, observacoes,
+                tutores ( nome, telefone )
+            `)
+            .eq('id', petId)
+            .single();
+
+        let obsHtml = '';
+        if (petData) {
+            const tutorNome = petData.tutores ? petData.tutores.nome : 'Não informado';
+            const tutorFone = petData.tutores ? petData.tutores.telefone : 'Não informado';
+            const obsTexto = petData.observacoes ? escapeHtml(petData.observacoes) : 'Nenhuma observação cadastrada.';
+
+            obsHtml = `
+                <div style="background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <strong><i class="fa-solid fa-address-card" style="color:#e65100;"></i> Tutor: ${escapeHtml(tutorNome)}</strong>
+                        <span style="color:#e65100; font-weight:600;"><i class="fa-solid fa-phone"></i> ${escapeHtml(tutorFone)}</span>
+                    </div>
+                    <div><strong>Raça / Porte:</strong> ${escapeHtml(petData.raca_porte || '-')}</div>
+                    <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ffd180; color: #d84315;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> <strong>Observações / Cuidados Especiais:</strong><br>
+                        ${obsTexto}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2. Busca todos os atendimentos desde o PRIMEIRO (ordem cronológica decrescente)
+        const { data: atendimentosData, error: errAtend } = await client
             .from('atendimentos')
             .select(`
                 id, servico, tipo, status, valor, data_entrada, servicos_adicionais,
@@ -249,43 +296,48 @@ async function abrirHistoricoPet(petId, petNome) {
             .eq('pet_id', petId)
             .order('data_entrada', { ascending: false });
 
-        if (error) {
-            container.innerHTML = `<p style="color:#d32f2f;">Erro ao buscar histórico: ${error.message}</p>`;
+        if (errAtend) {
+            container.innerHTML = obsHtml + `<p style="color:#d32f2f;">Erro ao buscar histórico: ${errAtend.message}</p>`;
             return;
         }
 
-        if (!data || data.length === 0) {
-            container.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Nenhum atendimento registrado no histórico para este pet.</p>`;
-            return;
-        }
+        let historicoListHtml = '';
 
-        container.innerHTML = '';
-        data.forEach(item => {
-            const dt = item.data_entrada ? new Date(item.data_entrada).toLocaleString('pt-BR') : '-';
-            const atendIn = item.atendente_checkin ? item.atendente_checkin.nome : 'Sistema';
-            const atendOut = item.atendente_checkout ? item.atendente_checkout.nome : '-';
+        if (!atendimentosData || atendimentosData.length === 0) {
+            historicoListHtml = `<p style="text-align:center; color:#888; padding:15px; background:#f9f9f9; border-radius:6px;">Este pet ainda não possui histórico de atendimentos anteriores no sistema.</p>`;
+        } else {
+            atendimentosData.forEach((item, index) => {
+                const dt = item.data_entrada ? new Date(item.data_entrada).toLocaleString('pt-BR') : '-';
+                const atendIn = item.atendente_checkin ? item.atendente_checkin.nome : 'Sistema';
+                const atendOut = item.atendente_checkout ? item.atendente_checkout.nome : '-';
+                const numAtendimento = atendimentosData.length - index;
 
-            let adicionaisTexto = '';
-            if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
-                adicionaisTexto = `<br><span style="color:#6a1b9a;">+ Adicionais: ${item.servicos_adicionais.map(s => escapeHtml(s.nome)).join(', ')}</span>`;
-            }
+                let adicionaisTexto = '';
+                if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
+                    adicionaisTexto = `<br><span style="color:#6a1b9a;">+ Adicionais: ${item.servicos_adicionais.map(s => escapeHtml(s.nome)).join(', ')}</span>`;
+                }
 
-            container.innerHTML += `
-                <div style="background:#fafafa; border:1px solid #eee; border-radius:6px; padding:10px; margin-bottom:8px; font-size:12px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <strong>${escapeHtml(item.servico)} (${item.tipo})</strong>
-                        <span class="badge" style="background:#e8f5e9; color:#2e7d32;">${item.status}</span>
+                historicoListHtml += `
+                    <div style="background:#fafafa; border:1px solid #eee; border-radius:6px; padding:10px; margin-bottom:8px; font-size:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <strong>#${numAtendimento} - ${escapeHtml(item.servico)} (${item.tipo})</strong>
+                            <span class="badge" style="background:${item.status === 'finalizado' ? '#e8f5e9' : '#fff3e0'}; color:${item.status === 'finalizado' ? '#2e7d32' : '#e65100'}; font-size:10px;">
+                                ${escapeHtml(item.status)}
+                            </span>
+                        </div>
+                        <p style="color:#555; margin:2px 0;">
+                            Data: <strong>${dt}</strong> | Valor Total: <strong>R$ ${parseFloat(item.valor || 0).toFixed(2)}</strong> ${adicionaisTexto}
+                        </p>
+                        <small style="color:#777;">Atendente Check-in: <strong>${escapeHtml(atendIn)}</strong> | Check-out: <strong>${escapeHtml(atendOut)}</strong></small>
                     </div>
-                    <p style="color:#666; margin:2px 0;">
-                        Data: <strong>${dt}</strong> | Valor: <strong>R$ ${parseFloat(item.valor || 0).toFixed(2)}</strong> ${adicionaisTexto}
-                    </p>
-                    <small style="color:#888;">Operador In: ${escapeHtml(atendIn)} | Operador Out: ${escapeHtml(atendOut)}</small>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
+
+        container.innerHTML = obsHtml + `<h4 style="font-size:13px; color:var(--purple-main); margin:10px 0 8px 0;"><i class="fa-solid fa-list-ol"></i> Registros de Atendimentos (${atendimentosData ? atendimentosData.length : 0})</h4>` + historicoListHtml;
 
     } catch (e) {
-        container.innerHTML = `<p style="color:#d32f2f;">Erro: ${e.message}</p>`;
+        container.innerHTML = `<p style="color:#d32f2f;">Erro ao carregar histórico: ${e.message}</p>`;
     }
 }
 
@@ -382,7 +434,6 @@ function renderAtendimentos(filter = 'todos') {
     });
 }
 
-// (MANTIDAS AS DEMAIS FUNÇÕES DE CAIXA, USUÁRIOS E SEGURANÇA)
 async function salvarUsuarioAtendente(e) {
     if (e) e.preventDefault();
     if (!validarPermissaoAdmin()) return;

@@ -367,14 +367,23 @@
                 <h3>Novo Check-in de Pet</h3>
                 <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalAtendimento')"></i>
             </div>
+
             <div class="form-group">
                 <label>Selecione o Pet / Tutor *</label>
-                <select class="form-control" id="selectPetCheckin" required></select>
+                <div style="display: flex; gap: 6px;">
+                    <select class="form-control" id="selectPetCheckin" required style="flex: 1;"></select>
+                    <button type="button" class="btn btn-sm btn-purple" onclick="abrirHistoricoPetSelecionadoCheckin()"
+                        title="Ver Histórico e Observações do Pet">
+                        <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+                    </button>
+                </div>
             </div>
+
             <div class="form-group">
                 <label>Atendente Responsável pelo Check-in *</label>
                 <select class="form-control" id="selectAtendenteCheckin" required></select>
             </div>
+
             <div class="form-group">
                 <label>Tipo de Cobrança do Banho/Serviço Principal</label>
                 <select class="form-control" id="selectTipoCobranca" onchange="toggleValorAvulso()">
@@ -382,6 +391,7 @@
                     <option value="avulso">Atendimento Avulso</option>
                 </select>
             </div>
+
             <div class="form-group">
                 <label>Serviço Principal Executado</label>
                 <select class="form-control" id="selectServico">
@@ -390,6 +400,7 @@
                     <option value="Tosa Higiênica">Tosa Higiênica</option>
                 </select>
             </div>
+
             <div class="form-group">
                 <label>Forma de Devolução</label>
                 <select class="form-control" id="selectTipoEntrega">
@@ -409,6 +420,7 @@
                 <label>Valor do Serviço Principal (R$)</label>
                 <input type="number" id="valorAvulso" class="form-control" value="70">
             </div>
+
             <div class="form-group" id="groupFormaPagamentoAvulso" style="display:none;">
                 <label>Forma de Pagamento</label>
                 <select class="form-control" id="pagamentoAvulso">
@@ -417,6 +429,7 @@
                     <option value="Dinheiro">Dinheiro</option>
                 </select>
             </div>
+
             <div class="modal-actions">
                 <button class="btn btn-sm btn-gray" onclick="closeModal('modalAtendimento')">Cancelar</button>
                 <button class="btn btn-purple btn-sm" onclick="salvarCheckin()">Confirmar Entrada</button>
