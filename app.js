@@ -1399,14 +1399,37 @@ async function salvarCheckin() {
             return;
         }
 
-        let atendenteId = atendenteSelect ? parseInt(atendenteSelect.value) : null;
-        if ((!atendenteId || isNaN(atendenteId)) && usuarioLogado) {
-            atendenteId = usuarioLogado.id;
+        let usuarioSelectId = atendenteSelect ? parseInt(atendenteSelect.value) : null;
+        if ((!usuarioSelectId || isNaN(usuarioSelectId)) && usuarioLogado) {
+            usuarioSelectId = usuarioLogado.id;
         }
 
-        if (!atendenteId || isNaN(atendenteId)) {
+        if (!usuarioSelectId || isNaN(usuarioSelectId)) {
             alert('Selecione o atendente responsável pelo check-in.');
             return;
+        }
+
+        // 1. Busca os dados do usuário selecionado no select (para obter o nome exato)
+        const { data: usuarioData } = await client
+            .from('usuarios')
+            .select('nome')
+            .eq('id', usuarioSelectId)
+            .single();
+
+        const nomeAtendente = usuarioData ? usuarioData.nome : (usuarioLogado ? usuarioLogado.nome : '');
+
+        // 2. Busca o ID correspondente pelo NOME na tabela 'atendentes'
+        let atendenteId = usuarioSelectId;
+        if (nomeAtendente) {
+            const { data: atendenteMatch } = await client
+                .from('atendentes')
+                .select('id')
+                .ilike('nome', nomeAtendente.trim())
+                .limit(1);
+
+            if (atendenteMatch && atendenteMatch.length > 0) {
+                atendenteId = atendenteMatch[0].id;
+            }
         }
 
         const petId = parseInt(petSelect.value);
