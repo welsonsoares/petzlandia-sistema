@@ -18,6 +18,17 @@ function getSupabase() {
     return _supabase;
 }
 
+// FUNÇÃO DE HIGIENIZAÇÃO DE ENTRADAS (PREVENÇÃO CONTRA XSS)
+function escapeHtml(texto) {
+    if (!texto) return '';
+    return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 let cadastros = [];
 let pacotes = [];
 let atendimentos = [];
@@ -142,7 +153,7 @@ function popularSelectsAtendentes() {
                 );
                 if (isSelected) idAtendenteEncontrado = a.id;
 
-                el.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+                el.innerHTML += `<option value="${a.id}">${escapeHtml(a.nome)}</option>`;
             });
 
             if (idAtendenteEncontrado) {
@@ -206,8 +217,8 @@ function renderListaAtendentes(todosUsuarios) {
         container.innerHTML += `
             <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 12px; ${!isAtivo ? 'opacity: 0.55; background: #f9f9f9;' : ''}">
                 <div>
-                    <strong><i class="fa-solid ${isAdm ? 'fa-user-shield' : 'fa-user-check'}" style="color:var(--purple-main);"></i> ${u.nome}</strong> 
-                    <small style="color:#777;">(${u.email})</small><br>
+                    <strong><i class="fa-solid ${isAdm ? 'fa-user-shield' : 'fa-user-check'}" style="color:var(--purple-main);"></i> ${escapeHtml(u.nome)}</strong> 
+                    <small style="color:#777;">(${escapeHtml(u.email)})</small><br>
                     <span class="badge ${isAdm ? 'badge-pacote' : 'badge-avulso'}" style="background:${isAdm ? '#f3e5f5' : '#e8f5e9'}; color:${isAdm ? '#6a1b9a' : '#2e7d32'}; font-size:9px;">
                         ${isAdm ? 'Administrador' : 'Atendente'}
                     </span>
@@ -409,11 +420,11 @@ function renderAtendimentos(filter = 'todos') {
 
         let adicionaisTexto = '';
         if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
-            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => s.nome).join(', ')}</span>`;
+            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => escapeHtml(s.nome)).join(', ')}</span>`;
         }
 
-        let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${item.atendente_checkin.nome}</span>` : '';
-        let tagCheckout = item.atendente_checkout ? `<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-check"></i> Out: ${item.atendente_checkout.nome}</span>` : '';
+        let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${escapeHtml(item.atendente_checkin.nome)}</span>` : '';
+        let tagCheckout = item.atendente_checkout ? `<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-check"></i> Out: ${escapeHtml(item.atendente_checkout.nome)}</span>` : '';
 
         list.innerHTML += `
             <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
@@ -423,8 +434,8 @@ function renderAtendimentos(filter = 'todos') {
                             <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
                         </div>
                         <div>
-                            <strong>${petNome}</strong> <small>(${tutorNome})</small> ${tagCheckin} ${tagCheckout}
-                            <p style="font-size:11px; color:#666;">${item.servico} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
+                            <strong>${escapeHtml(petNome)}</strong> <small>(${escapeHtml(tutorNome)})</small> ${tagCheckin} ${tagCheckout}
+                            <p style="font-size:11px; color:#666;">${escapeHtml(item.servico)} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
                         </div>
                     </div>
                     <div>
@@ -443,7 +454,7 @@ function renderAtendimentos(filter = 'todos') {
                             <i class="fa-solid fa-check"></i> Marcar como Pronto
                         </button>
                     ` : `
-                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${tutorNome}', '${tutorFone}', '${petNome}', '${tipoEntrega}')">
+                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${escapeHtml(tutorNome)}', '${escapeHtml(tutorFone)}', '${escapeHtml(petNome)}', '${tipoEntrega}')">
                             <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
                         </button>
                         <button class="btn btn-sm btn-purple" onclick="abrirModalCheckout(${item.id})">
@@ -557,7 +568,7 @@ function renderPacotes() {
         list.innerHTML += `
             <div class="pkg-card">
                 <div style="display:flex; justify-content:space-between; font-size:13px;">
-                    <strong>${petNome} <small>(${tutorNome})</small></strong>
+                    <strong>${escapeHtml(petNome)} <small>(${escapeHtml(tutorNome)})</small></strong>
                     <span style="color:var(--purple-main); font-weight:600;">${restante} restantes</span>
                 </div>
                 <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
@@ -650,10 +661,10 @@ function renderCaixa() {
         list.innerHTML += `
             <div class="service-item" style="${isCancelado ? 'opacity: 0.55; background: #f5f5f5;' : ''}">
                 <div>
-                    <strong>${c.descricao} ${isCancelado ? '<small style="color: #d32f2f; font-weight:bold;">(CANCELADO)</small>' : ''}</strong>
+                    <strong>${escapeHtml(c.descricao)} ${isCancelado ? '<small style="color: #d32f2f; font-weight:bold;">(CANCELADO)</small>' : ''}</strong>
                     <p style="font-size:11px; color:#666;">
-                        Forma de Pagamento: <strong>${c.forma_pagamento}</strong> 
-                        <span style="color: #6a1b9a; font-weight: 500;">• Operador: ${nomeAtend}</span>
+                        Forma de Pagamento: <strong>${escapeHtml(c.forma_pagamento)}</strong> 
+                        <span style="color: #6a1b9a; font-weight: 500;">• Operador: ${escapeHtml(nomeAtend)}</span>
                         ${c.data_lancamento ? ` • ${new Date(c.data_lancamento).toLocaleString('pt-BR')}` : ''}
                     </p>
                 </div>
@@ -793,7 +804,7 @@ function imprimirRelatorioCaixa() {
         <body>
             <div class="header">
                 <h2>Petz Lândia - Relatório de Fechamento & Vendas (RF17)</h2>
-                <p>Emissão: ${new Date().toLocaleString('pt-BR')} | Operador: ${usuarioLogado ? usuarioLogado.nome : 'Sistema'}</p>
+                <p>Emissão: ${new Date().toLocaleString('pt-BR')} | Operador: ${usuarioLogado ? escapeHtml(usuarioLogado.nome) : 'Sistema'}</p>
             </div>
 
             <div class="resumo-grid">
@@ -830,9 +841,9 @@ function imprimirRelatorioCaixa() {
                     ${caixaLancamentos.map(c => `
                         <tr class="${c.status === 'cancelado' ? 'cancelado' : ''}">
                             <td>${c.data_lancamento ? new Date(c.data_lancamento).toLocaleString('pt-BR') : '-'}</td>
-                            <td>${c.descricao}</td>
-                            <td>${c.atendentes ? c.atendentes.nome : 'Sistema'}</td>
-                            <td>${c.forma_pagamento}</td>
+                            <td>${escapeHtml(c.descricao)}</td>
+                            <td>${c.atendentes ? escapeHtml(c.atendentes.nome) : 'Sistema'}</td>
+                            <td>${escapeHtml(c.forma_pagamento)}</td>
                             <td class="${parseFloat(c.valor) < 0 ? 'sangria' : ''}">
                                 R$ ${parseFloat(c.valor || 0).toFixed(2)}
                             </td>
@@ -876,7 +887,7 @@ async function populateSelects() {
             cadastros = data;
             data.forEach(p => {
                 const tutorNome = p.tutores ? p.tutores.nome : '';
-                const opt = `<option value="${p.id}">${p.nome} (${tutorNome})</option>`;
+                const opt = `<option value="${p.id}">${escapeHtml(p.nome)} (${escapeHtml(tutorNome)})</option>`;
                 selCheckin.innerHTML += opt;
                 selPacote.innerHTML += opt;
                 if (selAdicional) selAdicional.innerHTML += opt;
@@ -936,7 +947,7 @@ async function carregarTabelaPrecosAdicionais() {
     servicosAdicionais.forEach(item => {
         container.innerHTML += `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px;">
-                <span style="font-size: 13px; font-weight: 500;">${item.nome}</span>
+                <span style="font-size: 13px; font-weight: 500;">${escapeHtml(item.nome)}</span>
                 <div style="display: flex; align-items: center; gap: 5px;">
                     <span style="font-size: 12px; color: #555;">R$</span>
                     <input type="number" step="0.50" min="0" class="form-control input-preco-adicional" data-id="${item.id}" value="${parseFloat(item.preco || 0).toFixed(2)}" style="width: 85px; padding: 4px 8px; font-size: 12px;">
@@ -982,7 +993,7 @@ function renderVendaAdicionaisLista() {
         container.innerHTML += `
             <label style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; cursor: pointer;">
                 <span>
-                    <input type="checkbox" class="chk-venda-adicional" value="${item.id}" data-preco="${v}" data-nome="${item.nome}" onchange="calcularTotalVendaAdicional()"> ${item.nome}
+                    <input type="checkbox" class="chk-venda-adicional" value="${item.id}" data-preco="${v}" data-nome="${escapeHtml(item.nome)}" onchange="calcularTotalVendaAdicional()"> ${escapeHtml(item.nome)}
                 </span>
                 <strong style="color: var(--purple-main);">R$ ${v}</strong>
             </label>
@@ -1065,7 +1076,7 @@ function renderCheckinAdicionais() {
         container.innerHTML += `
             <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 3px 0; cursor: pointer;">
                 <span>
-                    <input type="checkbox" class="chk-checkin-adicional" value="${item.id}" data-preco="${v}" data-nome="${item.nome}"> ${item.nome}
+                    <input type="checkbox" class="chk-checkin-adicional" value="${item.id}" data-preco="${v}" data-nome="${escapeHtml(item.nome)}"> ${escapeHtml(item.nome)}
                 </span>
                 <span style="color: #666;">+ R$ ${v}</span>
             </label>
@@ -1553,7 +1564,7 @@ function aplicarPermissoesPerfil() {
 
     if (displayInfo) displayInfo.style.display = 'block';
     if (btnLogout) btnLogout.style.display = 'inline-block';
-    if (userName) userName.innerText = usuarioLogado.nome;
+    if (userName) userName.innerText = escapeHtml(usuarioLogado.nome);
 
     const isAdmin = usuarioLogado.perfil === 'admin';
 
@@ -1647,6 +1658,17 @@ async function carregarHistoricoCaixas() {
         console.error('Erro ao carregar histórico:', e);
     }
 }
+
+// TRAVAS DE SEGURANÇA E BLOQUEIOS DE INSPEÇÃO NO FRONT-END
+document.addEventListener('contextmenu', event => event.preventDefault());
+
+document.onkeydown = function (e) {
+    if (e.keyCode == 123 ||
+        (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74)) ||
+        (e.ctrlKey && e.keyCode == 85)) {
+        return false;
+    }
+};
 
 // INICIALIZAÇÃO
 window.addEventListener('DOMContentLoaded', () => {
