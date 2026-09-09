@@ -248,7 +248,14 @@ function abrirHistoricoPetSelecionadoCheckin() {
 async function abrirHistoricoPet(petId, petNome) {
     const container = document.getElementById('historicoPetConteudo');
     const titulo = document.getElementById('historicoPetTitulo');
+    const modalHistorico = document.getElementById('modalHistoricoPet');
+
     if (!container) return;
+
+    // Eleva o z-index para garantir que a modal fique sempre no topo da tela
+    if (modalHistorico) {
+        modalHistorico.style.zIndex = '10000';
+    }
 
     titulo.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Histórico do Pet: <strong>${escapeHtml(petNome)}</strong>`;
     container.innerHTML = '<p style="text-align:center; color:#888; padding:15px;">Carregando histórico e observações...</p>';
