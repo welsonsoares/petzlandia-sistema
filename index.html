@@ -111,12 +111,15 @@
         <!-- SEÇÃO 2: CADASTROS, ATENDENTES/USUÁRIOS E PRECIFICAÇÃO -->
         <section id="sec-cadastros" class="tab-content">
             <div class="grid-2col">
-                <!-- COLUNA DA ESQUERDA: CADASTRO DE TUTOR/PET E CADASTRO DE USUÁRIOS/ATENDENTES -->
+                <!-- COLUNA DA ESQUERDA: CADASTROS -->
                 <div>
                     <!-- FORMULÁRIO DE CADASTRO INTEGRADO TUTOR/PET -->
                     <div class="panel">
                         <div class="panel-header">
                             <div class="panel-title"><i class="fa-solid fa-user-plus"></i> Novo Cadastro Integrado</div>
+                            <button class="btn btn-sm btn-purple" onclick="openModal('modalNovoPetTutor')">
+                                <i class="fa-solid fa-dog"></i> + Pet p/ Tutor Existente
+                            </button>
                         </div>
                         <form id="formCadastro" onsubmit="salvarCadastro(event)">
                             <div class="form-grid">
@@ -246,7 +249,7 @@
                     </div>
                 </div>
 
-                <!-- PAINEL DE RELATÓRIOS E FILTROS (RF17) -->
+                <!-- PAINEL DE RELATÓRIOS E FILTROS -->
                 <div class="panel" style="margin-top: 20px; background: #fafafa; border: 1px solid #eee;">
                     <div class="panel-title" style="font-size: 13px; margin-bottom: 10px;">
                         <i class="fa-solid fa-filter"></i> Filtro de Relatório de Vendas
@@ -281,7 +284,7 @@
                     </div>
                 </div>
 
-                <!-- HISTÓRICO DE LANÇAMENTOS COM EXPORTAÇÃO (RF17) -->
+                <!-- HISTÓRICO DE LANÇAMENTOS -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
                     <div class="panel-title">
                         <i class="fa-solid fa-receipt"></i> Lançamentos & Vendas Registradas
@@ -309,6 +312,52 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- MODAL: CADASTRAR NOVO PET PARA TUTOR EXISTENTE -->
+    <div class="modal-overlay" id="modalNovoPetTutor">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Adicionar Novo Pet a Tutor Existente</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalNovoPetTutor')"></i>
+            </div>
+            <div class="form-group">
+                <label>Selecione o Tutor *</label>
+                <select class="form-control" id="selectTutorExistente" required></select>
+            </div>
+            <div class="form-group">
+                <label>Nome do Novo Pet *</label>
+                <input type="text" id="cadNovoPetNome" class="form-control" required placeholder="Ex: Mel">
+            </div>
+            <div class="form-group">
+                <label>Raça e Porte *</label>
+                <input type="text" id="cadNovoPetRaca" class="form-control" required
+                    placeholder="Ex: Shihtzu / Pequeno">
+            </div>
+            <div class="form-group">
+                <label>Observações Fixas / Alergias</label>
+                <textarea id="cadNovoPetObs" class="form-control" rows="2"
+                    placeholder="Ex: Alérgico a sabonete."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalNovoPetTutor')">Cancelar</button>
+                <button class="btn btn-purple btn-sm" onclick="salvarNovoPetTutorExistente()">Salvar Novo Pet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: HISTÓRICO COMPLETO DO PET -->
+    <div class="modal-overlay" id="modalHistoricoPet">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="historicoPetTitulo"><i class="fa-solid fa-clock-rotate-left"></i> Histórico do Pet</h3>
+                <i class="fa-solid fa-xmark closeModalBtn" onclick="closeModal('modalHistoricoPet')"></i>
+            </div>
+            <div id="historicoPetConteudo" style="max-height: 380px; overflow-y: auto; margin-top: 10px;"></div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="btn btn-sm btn-gray" onclick="closeModal('modalHistoricoPet')">Fechar</button>
+            </div>
+        </div>
     </div>
 
     <!-- MODAL: NOVO CHECK-IN -->

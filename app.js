@@ -18,7 +18,7 @@ function getSupabase() {
     return _supabase;
 }
 
-// FUNÇÃO DE HIGIENIZAÇÃO DE ENTRADAS (PREVENÇÃO CONTRA XSS)
+// FUNÇÃO DE HIGIENIZAÇÃO DE ENTRADAS (XSS)
 function escapeHtml(texto) {
     if (!texto) return '';
     return String(texto)
@@ -35,6 +35,7 @@ let atendimentos = [];
 let caixaLancamentos = [];
 let servicosAdicionais = [];
 let atendentes = [];
+let tutoresLista = [];
 let caixaAtualSessao = null;
 let usuarioLogado = null;
 
@@ -64,6 +65,7 @@ function switchTab(tabId, btnElement = null) {
     if (tabId === 'cadastros') {
         carregarTabelaPrecosAdicionais();
         carregarAtendentes();
+        carregarTutoresSelect();
     }
     if (tabId === 'caixa') {
         carregarCaixa();
@@ -159,6 +161,228 @@ function popularSelectsAtendentes() {
     });
 }
 
+// CARREGAR TUTORES EXISTENTES NO SELECT
+async function carregarTutoresSelect() {
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('tutores')
+            .select('*')
+            .order('nome');
+
+        if (!error && data) {
+            tutoresLista = data;
+            const sel = document.getElementById('selectTutorExistente');
+            if (sel) {
+                sel.innerHTML = '<option value="">Selecione um Tutor...</option>';
+                data.forEach(t => {
+                    sel.innerHTML += `<option value="${t.id}">${escapeHtml(t.nome)} (${escapeHtml(t.telefone || 'Sem fone')})</option>`;
+                });
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao carregar tutores:', e);
+    }
+}
+
+// SALVAR NOVO PET PARA TUTOR EXISTENTE
+async function salvarNovoPetTutorExistente() {
+    const tutorId = document.getElementById('selectTutorExistente').value;
+    const petNome = document.getElementById('cadNovoPetNome').value.trim();
+    const petRaca = document.getElementById('cadNovoPetRaca').value.trim();
+    const petObs = document.getElementById('cadNovoPetObs').value.trim();
+
+    if (!tutorId || !petNome || !petRaca) {
+        alert('Por favor, selecione o tutor e preencha o nome e raça/porte do pet.');
+        return;
+    }
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { error } = await client
+            .from('pets')
+            .insert([{
+                tutor_id: parseInt(tutorId),
+                nome: petNome,
+                raca_porte: petRaca,
+                observacoes: petObs
+            }]);
+
+        if (error) {
+            alert('Erro ao cadastrar pet: ' + error.message);
+            return;
+        }
+
+        closeModal('modalNovoPetTutor');
+        alert(`Novo Pet ${petNome} vinculado ao tutor com sucesso!`);
+        await populateSelects();
+    } catch (e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+// CONSULTAR E EXIBIR HISTÓRICO COMPLETO DO PET
+async function abrirHistoricoPet(petId, petNome) {
+    const container = document.getElementById('historicoPetConteudo');
+    const titulo = document.getElementById('historicoPetTitulo');
+    if (!container) return;
+
+    titulo.innerHTML = `<i class="fa-solid fa-clock-rotate-left"></i> Histórico do Pet: <strong>${escapeHtml(petNome)}</strong>`;
+    container.innerHTML = '<p style="text-align:center; color:#888;">Carregando histórico...</p>';
+    openModal('modalHistoricoPet');
+
+    try {
+        const client = getSupabase();
+        if (!client) return;
+
+        const { data, error } = await client
+            .from('atendimentos')
+            .select(`
+                id, servico, tipo, status, valor, data_entrada, servicos_adicionais,
+                atendente_checkin:atendente_checkin_id ( nome ),
+                atendente_checkout:atendente_checkout_id ( nome )
+            `)
+            .eq('pet_id', petId)
+            .order('data_entrada', { ascending: false });
+
+        if (error) {
+            container.innerHTML = `<p style="color:#d32f2f;">Erro ao buscar histórico: ${error.message}</p>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            container.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Nenhum atendimento registrado no histórico para este pet.</p>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        data.forEach(item => {
+            const dt = item.data_entrada ? new Date(item.data_entrada).toLocaleString('pt-BR') : '-';
+            const atendIn = item.atendente_checkin ? item.atendente_checkin.nome : 'Sistema';
+            const atendOut = item.atendente_checkout ? item.atendente_checkout.nome : '-';
+
+            let adicionaisTexto = '';
+            if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
+                adicionaisTexto = `<br><span style="color:#6a1b9a;">+ Adicionais: ${item.servicos_adicionais.map(s => escapeHtml(s.nome)).join(', ')}</span>`;
+            }
+
+            container.innerHTML += `
+                <div style="background:#fafafa; border:1px solid #eee; border-radius:6px; padding:10px; margin-bottom:8px; font-size:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <strong>${escapeHtml(item.servico)} (${item.tipo})</strong>
+                        <span class="badge" style="background:#e8f5e9; color:#2e7d32;">${item.status}</span>
+                    </div>
+                    <p style="color:#666; margin:2px 0;">
+                        Data: <strong>${dt}</strong> | Valor: <strong>R$ ${parseFloat(item.valor || 0).toFixed(2)}</strong> ${adicionaisTexto}
+                    </p>
+                    <small style="color:#888;">Operador In: ${escapeHtml(atendIn)} | Operador Out: ${escapeHtml(atendOut)}</small>
+                </div>
+            `;
+        });
+
+    } catch (e) {
+        container.innerHTML = `<p style="color:#d32f2f;">Erro: ${e.message}</p>`;
+    }
+}
+
+function renderAtendimentos(filter = 'todos') {
+    const list = document.getElementById('serviceList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    let filtered = atendimentos.filter(a => {
+        const st = (a.status || 'em_andamento').toLowerCase().trim();
+        if (st === 'finalizado') return false;
+
+        if (filter === 'todos') return true;
+        if (filter === 'em_andamento') return st === 'em_andamento' || st === 'em atendimento';
+        if (filter === 'pronto') return st === 'pronto';
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento presente no momento.</p>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const isPkg = item.tipo === 'pacote';
+
+        let petNome = 'Pet Sem Nome';
+        let tutorNome = 'Tutor Não Informado';
+        let tutorFone = '';
+        let petId = item.pet_id;
+
+        if (item.pets) {
+            petNome = item.pets.nome || petNome;
+            if (item.pets.tutores) {
+                tutorNome = item.pets.tutores.nome || tutorNome;
+                tutorFone = item.pets.tutores.telefone || '';
+            }
+        }
+
+        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
+        const isPronto = (item.status || '').toLowerCase().trim() === 'pronto';
+        const tipoEntrega = item.tipo_entrega || 'retirada';
+        const textoEntrega = tipoEntrega === 'entrega' ? 'Delivery / Táxi Pet' : 'Retirada na Loja';
+
+        let adicionaisTexto = '';
+        if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
+            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => `${escapeHtml(s.nome)} (R$ ${parseFloat(s.preco || 0).toFixed(2)})`).join(', ')}</span>`;
+        }
+
+        let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${escapeHtml(item.atendente_checkin.nome)}</span>` : '';
+        let tagCheckout = item.atendente_checkout ? `<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-check"></i> Out: ${escapeHtml(item.atendente_checkout.nome)}</span>` : '';
+
+        list.innerHTML += `
+            <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="pet-info">
+                        <div class="pet-icon" style="background:${isPronto ? '#e8f5e9' : '#f0eaf4'}; color:${isPronto ? '#2e7d32' : 'var(--purple-main)'};">
+                            <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
+                        </div>
+                        <div>
+                            <strong>${escapeHtml(petNome)}</strong> <small>(${escapeHtml(tutorNome)})</small> ${tagCheckin} ${tagCheckout}
+                            <button class="btn btn-sm btn-gray" style="padding:1px 6px; font-size:9px; margin-left:6px;" onclick="abrirHistoricoPet(${petId}, '${escapeHtml(petNome)}')">
+                                <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+                            </button>
+                            <p style="font-size:11px; color:#666;">${escapeHtml(item.servico)} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="badge ${isPronto ? 'badge-avulso' : 'badge-pacote'}" style="margin-right:5px;">
+                            ${isPronto ? 'Pronto para Busca' : 'Em Atendimento'}
+                        </span>
+                        <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
+                            ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #f0eaf4; padding-top:8px;">
+                    ${!isPronto ? `
+                        <button class="btn btn-sm btn-yellow" onclick="alterarStatusAtendimento(${item.id}, 'pronto')">
+                            <i class="fa-solid fa-check"></i> Marcar como Pronto
+                        </button>
+                    ` : `
+                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${escapeHtml(tutorNome)}', '${escapeHtml(tutorFone)}', '${escapeHtml(petNome)}', '${tipoEntrega}')">
+                            <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
+                        </button>
+                        <button class="btn btn-sm btn-purple" onclick="abrirModalCheckout(${item.id})">
+                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
+                        </button>
+                    `}
+                </div>
+            </div>
+        `;
+    });
+}
+
+// (MANTIDAS AS DEMAIS FUNÇÕES DE CAIXA, USUÁRIOS E SEGURANÇA)
 async function salvarUsuarioAtendente(e) {
     if (e) e.preventDefault();
     if (!validarPermissaoAdmin()) return;
@@ -354,106 +578,6 @@ async function carregarCatalogoAdicionais() {
     } catch (e) {
         console.error('Erro ao carregar serviços adicionais:', e);
     }
-}
-
-function renderAtendimentos(filter = 'todos') {
-    const list = document.getElementById('serviceList');
-    if (!list) return;
-    list.innerHTML = '';
-
-    let filtered = atendimentos.filter(a => {
-        const st = (a.status || 'em_andamento').toLowerCase().trim();
-        if (st === 'finalizado') return false;
-
-        if (filter === 'todos') return true;
-        if (filter === 'em_andamento') return st === 'em_andamento' || st === 'em atendimento';
-        if (filter === 'pronto') return st === 'pronto';
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        list.innerHTML = `<p style="text-align:center; color:#888; padding:15px;">Nenhum atendimento presente no momento.</p>`;
-        return;
-    }
-
-    filtered.forEach(item => {
-        const isPkg = item.tipo === 'pacote';
-
-        let petNome = 'Pet Sem Nome';
-        let tutorNome = 'Tutor Não Informado';
-        let tutorFone = '';
-
-        if (item.pets) {
-            petNome = item.pets.nome || petNome;
-            if (item.pets.tutores) {
-                tutorNome = item.pets.tutores.nome || tutorNome;
-                tutorFone = item.pets.tutores.telefone || '';
-            }
-        }
-
-        if (petNome === 'Pet Sem Nome' && item.pet_id) {
-            const localPet = cadastros.find(c => c.id === item.pet_id);
-            if (localPet) {
-                petNome = localPet.nome;
-                if (localPet.tutores) {
-                    tutorNome = localPet.tutores.nome;
-                    tutorFone = localPet.tutores.telefone || '';
-                }
-            }
-        }
-
-        const hora = item.data_entrada ? new Date(item.data_entrada).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--';
-        const isPronto = (item.status || '').toLowerCase().trim() === 'pronto';
-        const tipoEntrega = item.tipo_entrega || 'retirada';
-        const textoEntrega = tipoEntrega === 'entrega' ? 'Delivery / Táxi Pet' : 'Retirada na Loja';
-
-        let adicionaisTexto = '';
-        if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
-            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => `${escapeHtml(s.nome)} (R$ ${parseFloat(s.preco || 0).toFixed(2)})`).join(', ')}</span>`;
-        }
-
-        let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${escapeHtml(item.atendente_checkin.nome)}</span>` : '';
-        let tagCheckout = item.atendente_checkout ? `<span class="badge" style="background:#e8f5e9; color:#2e7d32; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-check"></i> Out: ${escapeHtml(item.atendente_checkout.nome)}</span>` : '';
-
-        list.innerHTML += `
-            <div class="service-item" style="flex-direction:column; align-items:stretch; gap:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div class="pet-info">
-                        <div class="pet-icon" style="background:${isPronto ? '#e8f5e9' : '#f0eaf4'}; color:${isPronto ? '#2e7d32' : 'var(--purple-main)'};">
-                            <i class="fa-solid ${isPronto ? 'fa-circle-check' : 'fa-dog'}"></i>
-                        </div>
-                        <div>
-                            <strong>${escapeHtml(petNome)}</strong> <small>(${escapeHtml(tutorNome)})</small> ${tagCheckin} ${tagCheckout}
-                            <p style="font-size:11px; color:#666;">${escapeHtml(item.servico)} • ${textoEntrega} • Entrou às ${hora} ${adicionaisTexto}</p>
-                        </div>
-                    </div>
-                    <div>
-                        <span class="badge ${isPronto ? 'badge-avulso' : 'badge-pacote'}" style="margin-right:5px;">
-                            ${isPronto ? 'Pronto para Busca' : 'Em Atendimento'}
-                        </span>
-                        <span class="badge ${isPkg ? 'badge-pacote' : 'badge-avulso'}">
-                            ${isPkg ? 'Pacote' : 'R$ ' + parseFloat(item.valor || 0).toFixed(2)}
-                        </span>
-                    </div>
-                </div>
-
-                <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #f0eaf4; padding-top:8px;">
-                    ${!isPronto ? `
-                        <button class="btn btn-sm btn-yellow" onclick="alterarStatusAtendimento(${item.id}, 'pronto')">
-                            <i class="fa-solid fa-check"></i> Marcar como Pronto
-                        </button>
-                    ` : `
-                        <button class="btn btn-sm" style="background:#25D366; color:#fff;" onclick="notificarWhatsapp('${escapeHtml(tutorNome)}', '${escapeHtml(tutorFone)}', '${escapeHtml(petNome)}', '${tipoEntrega}')">
-                            <i class="fa-brands fa-whatsapp"></i> Avisar no WhatsApp
-                        </button>
-                        <button class="btn btn-sm btn-purple" onclick="abrirModalCheckout(${item.id})">
-                            <i class="fa-solid fa-arrow-right-from-bracket"></i> Dar Check-out
-                        </button>
-                    `}
-                </div>
-            </div>
-        `;
-    });
 }
 
 async function alterarStatusAtendimento(id, novoStatus) {
@@ -906,6 +1030,9 @@ function openModal(id) {
     if (id === 'modalServicoAdicional') {
         renderVendaAdicionaisLista();
     }
+    if (id === 'modalNovoPetTutor') {
+        carregarTutoresSelect();
+    }
     document.getElementById(id).style.display = 'flex';
 }
 
@@ -913,7 +1040,6 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// TABELA DE PRECIFICAÇÃO DE ADICIONAIS COM OPÇÃO 'A PARTIR DE'
 async function carregarTabelaPrecosAdicionais() {
     const container = document.getElementById('tabelaPrecosAdicionaisContainer');
     if (!container) return;
@@ -965,7 +1091,6 @@ async function salvarPrecosAdicionais() {
     }
 }
 
-// VENDAS AVULSAS DE ADICIONAIS COM VALOR EDITÁVEL QUANDO 'A PARTIR DE'
 function renderVendaAdicionaisLista() {
     const container = document.getElementById('vendaAdicionaisListaContainer');
     if (!container) return;
@@ -1086,7 +1211,6 @@ async function salvarVendaAdicionalAvulso() {
     }
 }
 
-// CHECK-IN COM ADICIONAIS EDITÁVEIS QUANDO 'A PARTIR DE'
 function renderCheckinAdicionais() {
     const container = document.getElementById('checkinAdicionaisContainer');
     if (!container) return;
@@ -1707,7 +1831,7 @@ async function carregarHistoricoCaixas() {
     }
 }
 
-// TRAVAS DE SEGURANÇA E BLOQUEIOS DE INSPEÇÃO NO FRONT-END
+// TRAVAS DE SEGURANÇA NO FRONT-END
 document.addEventListener('contextmenu', event => event.preventDefault());
 
 document.onkeydown = function (e) {
