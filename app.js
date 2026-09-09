@@ -147,6 +147,7 @@ function popularSelectsAtendentes() {
 
             atendentes.forEach(a => {
                 const isSelected = usuarioLogado && (
+                    a.id === usuarioLogado.id ||
                     a.nome.toLowerCase().trim() === usuarioLogado.nome.toLowerCase().trim()
                 );
                 if (isSelected) idAtendenteEncontrado = a.id;
@@ -156,6 +157,9 @@ function popularSelectsAtendentes() {
 
             if (idAtendenteEncontrado) {
                 el.value = idAtendenteEncontrado;
+            } else if (usuarioLogado) {
+                const matchDireto = atendentes.find(a => a.id === usuarioLogado.id);
+                if (matchDireto) el.value = matchDireto.id;
             }
         }
     });
@@ -1087,6 +1091,17 @@ function openModal(id) {
     if (id === 'modalAtendimento') {
         toggleValorAvulso();
         renderCheckinAdicionais();
+
+        const selAtend = document.getElementById('selectAtendenteCheckin');
+        if (selAtend && usuarioLogado) {
+            const opEncontrada = Array.from(selAtend.options).find(opt =>
+                opt.text.toLowerCase().trim() === usuarioLogado.nome.toLowerCase().trim() ||
+                parseInt(opt.value) === usuarioLogado.id
+            );
+            if (opEncontrada) {
+                selAtend.value = opEncontrada.value;
+            }
+        }
     }
     if (id === 'modalServicoAdicional') {
         renderVendaAdicionaisLista();
@@ -1377,13 +1392,17 @@ async function salvarCheckin() {
             return;
         }
 
-        if (!atendenteSelect || !atendenteSelect.value) {
+        let atendenteId = atendenteSelect ? parseInt(atendenteSelect.value) : null;
+        if ((!atendenteId || isNaN(atendenteId)) && usuarioLogado) {
+            atendenteId = usuarioLogado.id;
+        }
+
+        if (!atendenteId || isNaN(atendenteId)) {
             alert('Selecione o atendente responsável pelo check-in.');
             return;
         }
 
         const petId = parseInt(petSelect.value);
-        const atendenteId = parseInt(atendenteSelect.value);
         const tipo = document.getElementById('selectTipoCobranca').value;
         const servico = document.getElementById('selectServico').value;
         const selectEntregaElem = document.getElementById('selectTipoEntrega');
