@@ -38,7 +38,6 @@ let atendentes = [];
 let caixaAtualSessao = null;
 let usuarioLogado = null;
 
-// TRAVA DE SEGURANÇA: VALIDAR SE O CAIXA ESTÁ ABERTO
 function validarCaixaAberto() {
     if (!caixaAtualSessao) {
         alert('Atenção: O caixa do dia está FECHADO!\nPor favor, peça a um Administrador para abrir o caixa na aba "Caixa Diário" para realizar vendas ou check-ins.');
@@ -72,7 +71,6 @@ function switchTab(tabId, btnElement = null) {
     }
 }
 
-// 1. CARREGAR ATENDIMENTOS, PACOTES, ADICIONAIS E ATENDENTES DO SUPABASE
 async function carregarDadosAtendimentos() {
     try {
         const client = getSupabase();
@@ -111,7 +109,6 @@ async function carregarDadosAtendimentos() {
     }
 }
 
-// CARREGAR CATÁLOGO DE ATENDENTES / USUÁRIOS
 async function carregarAtendentes() {
     try {
         const client = getSupabase();
@@ -132,7 +129,6 @@ async function carregarAtendentes() {
     }
 }
 
-// POPULAR SELECTS DE ATENDENTES NOS MODAIS E PRÉ-SELEÇÃO AUTOMÁTICA DO USUÁRIO LOGADO
 function popularSelectsAtendentes() {
     const ids = [
         'selectAtendenteCheckin',
@@ -163,7 +159,6 @@ function popularSelectsAtendentes() {
     });
 }
 
-// CADASTRAR NOVO USUÁRIO / ATENDENTE COM CREDENCIAIS DE ACESSO
 async function salvarUsuarioAtendente(e) {
     if (e) e.preventDefault();
     if (!validarPermissaoAdmin()) return;
@@ -202,7 +197,6 @@ async function salvarUsuarioAtendente(e) {
     }
 }
 
-// RENDERIZAR LISTA DE USUÁRIOS COM BOTÕES DE EDITAR E INATIVAR/ATIVAR
 function renderListaAtendentes(todosUsuarios) {
     const container = document.getElementById('listaAtendentesContainer');
     if (!container || !todosUsuarios) return;
@@ -241,7 +235,6 @@ function renderListaAtendentes(todosUsuarios) {
     });
 }
 
-// ABRIR MODAL E PREENCHER DADOS DO USUÁRIO
 async function abrirModalEditarUsuario(idUsuario) {
     try {
         const client = getSupabase();
@@ -270,7 +263,6 @@ async function abrirModalEditarUsuario(idUsuario) {
     }
 }
 
-// SALVAR ALTERAÇÕES DO USUÁRIO
 async function salvarEdicaoUsuario() {
     if (!validarPermissaoAdmin()) return;
 
@@ -315,7 +307,6 @@ async function salvarEdicaoUsuario() {
     }
 }
 
-// INATIVAR OU REATIVAR USUÁRIO / ATENDENTE
 async function alternarStatusUsuario(idUsuario, statusAtualAtivo) {
     if (!validarPermissaoAdmin()) return;
 
@@ -346,7 +337,6 @@ async function alternarStatusUsuario(idUsuario, statusAtualAtivo) {
     }
 }
 
-// CARREGAR CATÁLOGO DE SERVIÇOS ADICIONAIS
 async function carregarCatalogoAdicionais() {
     try {
         const client = getSupabase();
@@ -366,7 +356,6 @@ async function carregarCatalogoAdicionais() {
     }
 }
 
-// 2. RENDERIZAR PAINEL DE PETS PRESENTES
 function renderAtendimentos(filter = 'todos') {
     const list = document.getElementById('serviceList');
     if (!list) return;
@@ -420,7 +409,7 @@ function renderAtendimentos(filter = 'todos') {
 
         let adicionaisTexto = '';
         if (item.servicos_adicionais && Array.isArray(item.servicos_adicionais) && item.servicos_adicionais.length > 0) {
-            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => escapeHtml(s.nome)).join(', ')}</span>`;
+            adicionaisTexto = `<br><span style="color: #6a1b9a; font-size:11px;">+ Adicionais: ${item.servicos_adicionais.map(s => `${escapeHtml(s.nome)} (R$ ${parseFloat(s.preco || 0).toFixed(2)})`).join(', ')}</span>`;
         }
 
         let tagCheckin = item.atendente_checkin ? `<span class="badge" style="background:#f3e5f5; color:#6a1b9a; font-size:10px; margin-left:4px;"><i class="fa-solid fa-user-plus"></i> In: ${escapeHtml(item.atendente_checkin.nome)}</span>` : '';
@@ -467,7 +456,6 @@ function renderAtendimentos(filter = 'todos') {
     });
 }
 
-// 3. ALTERAR STATUS DE ATENDIMENTO
 async function alterarStatusAtendimento(id, novoStatus) {
     try {
         const client = getSupabase();
@@ -489,13 +477,11 @@ async function alterarStatusAtendimento(id, novoStatus) {
     }
 }
 
-// ABRIR MODAL DE CHECK-OUT COM ATENDENTE LOGADO PRÉ-SELECIONADO AUTOMATICAMENTE
 function abrirModalCheckout(atendimentoId) {
     document.getElementById('checkoutAtendimentoId').value = atendimentoId;
     openModal('modalCheckout');
 }
 
-// CONFIRMAR CHECK-OUT REGISTRANDO O ATENDENTE
 async function confirmarCheckoutAtendimento() {
     const id = document.getElementById('checkoutAtendimentoId').value;
     const atendenteId = document.getElementById('selectAtendenteCheckout').value;
@@ -530,7 +516,6 @@ async function confirmarCheckoutAtendimento() {
     }
 }
 
-// 4. NOTIFICAÇÃO DINÂMICA VIA WHATSAPP
 function notificarWhatsapp(tutorNome, fone, petNome, tipoEntrega = 'retirada') {
     if (!fone) {
         alert('Telefone do tutor não cadastrado.');
@@ -578,7 +563,6 @@ function renderPacotes() {
     });
 }
 
-// RF17 - CARREGAR LANÇAMENTOS DE CAIXA COM SUPORTE A FILTROS POR DATA E FORMA DE PAGAMENTO
 async function carregarCaixa() {
     try {
         const client = getSupabase();
@@ -592,7 +576,6 @@ async function carregarCaixa() {
             `)
             .order('data_lancamento', { ascending: false });
 
-        // Aplicação de Filtro por Período (RF17)
         const dtInicio = document.getElementById('filtroDataInicio')?.value;
         const dtFim = document.getElementById('filtroDataFim')?.value;
         const formaPagto = document.getElementById('filtroFormaPagto')?.value;
@@ -616,7 +599,6 @@ async function carregarCaixa() {
     }
 }
 
-// LIMPAR FILTROS DE PESQUISA DO CAIXA
 function limparFiltrosCaixa() {
     const elInicio = document.getElementById('filtroDataInicio');
     const elFim = document.getElementById('filtroDataFim');
@@ -629,7 +611,6 @@ function limparFiltrosCaixa() {
     carregarCaixa();
 }
 
-// RENDERIZAR CAIXA E CALCULAR SOMAS
 function renderCaixa() {
     const list = document.getElementById('caixaLancamentos');
     if (!list) return;
@@ -687,7 +668,6 @@ function renderCaixa() {
     document.getElementById('caixaOutros').innerText = `R$ ${outros.toFixed(2)}`;
 }
 
-// ESTORNAR LANÇAMENTO (EXCLUSIVO ADMIN)
 async function estornarLancamentoCaixa(idLancamento) {
     if (!validarPermissaoAdmin()) return;
 
@@ -721,7 +701,6 @@ async function estornarLancamentoCaixa(idLancamento) {
     }
 }
 
-// RF17 - EXPORTAÇÃO DE RELATÓRIO EM CSV
 function exportarCaixaCSV() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há lançamentos no caixa para exportar.');
@@ -754,7 +733,6 @@ function exportarCaixaCSV() {
     document.body.removeChild(link);
 }
 
-// RF17 - IMPRESSÃO DE RELATÓRIO SINTÉTICO E DETALHADO DE FECHAMENTO / VENDAS
 function imprimirRelatorioCaixa() {
     if (!caixaLancamentos || caixaLancamentos.length === 0) {
         alert('Não há dados de caixa para gerar relatório.');
@@ -912,7 +890,6 @@ function toggleValorAvulso() {
     }
 }
 
-// CONTROLAR ABERTURA DE MODAIS COM TRAVA DE CAIXA FECHADO
 function openModal(id) {
     if ((id === 'modalAtendimento' || id === 'modalPacote' || id === 'modalServicoAdicional') && !caixaAtualSessao) {
         alert('O caixa do dia precisa estar ABERTO para realizar vendas ou check-ins.\nContate um Administrador.');
@@ -936,7 +913,7 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
-// TABELA DE PRECIFICAÇÃO DE ADICIONAIS
+// TABELA DE PRECIFICAÇÃO DE ADICIONAIS COM OPÇÃO 'A PARTIR DE'
 async function carregarTabelaPrecosAdicionais() {
     const container = document.getElementById('tabelaPrecosAdicionaisContainer');
     if (!container) return;
@@ -945,12 +922,16 @@ async function carregarTabelaPrecosAdicionais() {
     container.innerHTML = '';
 
     servicosAdicionais.forEach(item => {
+        const isAPartir = item.a_partir === true;
         container.innerHTML += `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 5px;">
                 <span style="font-size: 13px; font-weight: 500;">${escapeHtml(item.nome)}</span>
-                <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="font-size: 11px; color: #666; cursor: pointer; display: flex; align-items: center; gap: 3px;">
+                        <input type="checkbox" class="chk-a-partir-adicional" data-id="${item.id}" ${isAPartir ? 'checked' : ''}> A partir de
+                    </label>
                     <span style="font-size: 12px; color: #555;">R$</span>
-                    <input type="number" step="0.50" min="0" class="form-control input-preco-adicional" data-id="${item.id}" value="${parseFloat(item.preco || 0).toFixed(2)}" style="width: 85px; padding: 4px 8px; font-size: 12px;">
+                    <input type="number" step="0.50" min="0" class="form-control input-preco-adicional" data-id="${item.id}" value="${parseFloat(item.preco || 0).toFixed(2)}" style="width: 80px; padding: 4px 8px; font-size: 12px;">
                 </div>
             </div>
         `;
@@ -964,14 +945,16 @@ async function salvarPrecosAdicionais() {
         const client = getSupabase();
         if (!client) return;
 
-        const inputs = document.querySelectorAll('.input-preco-adicional');
-        for (let input of inputs) {
+        const inputsPreco = document.querySelectorAll('.input-preco-adicional');
+        for (let input of inputsPreco) {
             const id = parseInt(input.getAttribute('data-id'));
             const novoPreco = parseFloat(input.value) || 0;
+            const chkAPartir = document.querySelector(`.chk-a-partir-adicional[data-id="${id}"]`);
+            const aPartirVal = chkAPartir ? chkAPartir.checked : false;
 
             await client
                 .from('servicos_adicionais')
-                .update({ preco: novoPreco })
+                .update({ preco: novoPreco, a_partir: aPartirVal })
                 .eq('id', id);
         }
 
@@ -982,7 +965,7 @@ async function salvarPrecosAdicionais() {
     }
 }
 
-// VENDAS AVULSAS DE ADICIONAIS
+// VENDAS AVULSAS DE ADICIONAIS COM VALOR EDITÁVEL QUANDO 'A PARTIR DE'
 function renderVendaAdicionaisLista() {
     const container = document.getElementById('vendaAdicionaisListaContainer');
     if (!container) return;
@@ -990,15 +973,35 @@ function renderVendaAdicionaisLista() {
 
     servicosAdicionais.forEach(item => {
         const v = parseFloat(item.preco || 0).toFixed(2);
+        const isAPartir = item.a_partir === true;
+
         container.innerHTML += `
-            <label style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; cursor: pointer;">
-                <span>
-                    <input type="checkbox" class="chk-venda-adicional" value="${item.id}" data-preco="${v}" data-nome="${escapeHtml(item.nome)}" onchange="calcularTotalVendaAdicional()"> ${escapeHtml(item.nome)}
-                </span>
-                <strong style="color: var(--purple-main);">R$ ${v}</strong>
-            </label>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 6px 0; border-bottom: 1px solid #f5f5f5;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" class="chk-venda-adicional" value="${item.id}" data-min-preco="${v}" data-nome="${escapeHtml(item.nome)}" onchange="toggleInputAdicionalVenda(${item.id})"> 
+                    ${escapeHtml(item.nome)} ${isAPartir ? '<small style="color:#e65100; font-weight:600;">(A partir)</small>' : ''}
+                </label>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 11px; color: #666;">R$</span>
+                    <input type="number" step="0.50" min="${v}" value="${v}" id="inputValVendaAdicional_${item.id}" class="form-control" 
+                           style="width: 75px; padding: 2px 5px; font-size: 12px; text-align: right;" 
+                           ${!isAPartir ? 'disabled' : 'readonly'} onchange="calcularTotalVendaAdicional()">
+                </div>
+            </div>
         `;
     });
+    calcularTotalVendaAdicional();
+}
+
+function toggleInputAdicionalVenda(id) {
+    const chk = document.querySelector(`.chk-venda-adicional[value="${id}"]`);
+    const inputVal = document.getElementById(`inputValVendaAdicional_${id}`);
+    if (chk && inputVal) {
+        const itemObj = servicosAdicionais.find(s => s.id === id);
+        if (itemObj && itemObj.a_partir) {
+            inputVal.readOnly = !chk.checked;
+        }
+    }
     calcularTotalVendaAdicional();
 }
 
@@ -1006,7 +1009,10 @@ function calcularTotalVendaAdicional() {
     const checkboxes = document.querySelectorAll('.chk-venda-adicional:checked');
     let total = 0;
     checkboxes.forEach(chk => {
-        total += parseFloat(chk.getAttribute('data-preco')) || 0;
+        const id = chk.value;
+        const inputVal = document.getElementById(`inputValVendaAdicional_${id}`);
+        const v = inputVal ? parseFloat(inputVal.value) || 0 : parseFloat(chk.getAttribute('data-min-preco')) || 0;
+        total += v;
     });
     document.getElementById('totalVendaAdicionalText').innerText = `R$ ${total.toFixed(2)}`;
 }
@@ -1035,10 +1041,25 @@ async function salvarVendaAdicionalAvulso() {
 
         let total = 0;
         let nomes = [];
+        let erroPrecoMinimo = false;
+
         checkboxes.forEach(chk => {
-            total += parseFloat(chk.getAttribute('data-preco')) || 0;
-            nomes.push(chk.getAttribute('data-nome'));
+            const id = chk.value;
+            const minPreco = parseFloat(chk.getAttribute('data-min-preco')) || 0;
+            const inputVal = document.getElementById(`inputValVendaAdicional_${id}`);
+            const valorFinal = inputVal ? parseFloat(inputVal.value) || 0 : minPreco;
+
+            if (valorFinal < minPreco) {
+                alert(`O valor do serviço ${chk.getAttribute('data-nome')} não pode ser menor que R$ ${minPreco.toFixed(2)}.`);
+                erroPrecoMinimo = true;
+                return;
+            }
+
+            total += valorFinal;
+            nomes.push(`${chk.getAttribute('data-nome')} (R$ ${valorFinal.toFixed(2)})`);
         });
+
+        if (erroPrecoMinimo) return;
 
         const petObj = cadastros.find(p => p.id === petId);
         const desc = `Serviços Adicionais (${nomes.join(', ')}) - ${petObj ? petObj.nome : ''}`;
@@ -1065,7 +1086,7 @@ async function salvarVendaAdicionalAvulso() {
     }
 }
 
-// CHECK-IN COM ADICIONAIS E ATENDENTE AUTOMÁTICO
+// CHECK-IN COM ADICIONAIS EDITÁVEIS QUANDO 'A PARTIR DE'
 function renderCheckinAdicionais() {
     const container = document.getElementById('checkinAdicionaisContainer');
     if (!container) return;
@@ -1073,15 +1094,34 @@ function renderCheckinAdicionais() {
 
     servicosAdicionais.forEach(item => {
         const v = parseFloat(item.preco || 0).toFixed(2);
+        const isAPartir = item.a_partir === true;
+
         container.innerHTML += `
-            <label style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 3px 0; cursor: pointer;">
-                <span>
-                    <input type="checkbox" class="chk-checkin-adicional" value="${item.id}" data-preco="${v}" data-nome="${escapeHtml(item.nome)}"> ${escapeHtml(item.nome)}
-                </span>
-                <span style="color: #666;">+ R$ ${v}</span>
-            </label>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed #eee;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                    <input type="checkbox" class="chk-checkin-adicional" value="${item.id}" data-min-preco="${v}" data-nome="${escapeHtml(item.nome)}" onchange="toggleInputAdicionalCheckin(${item.id})"> 
+                    ${escapeHtml(item.nome)} ${isAPartir ? '<small style="color:#e65100; font-weight:600;">(A partir)</small>' : ''}
+                </label>
+                <div style="display: flex; align-items: center; gap: 3px;">
+                    <span style="color: #666;">+ R$</span>
+                    <input type="number" step="0.50" min="${v}" value="${v}" id="inputValCheckinAdicional_${item.id}" class="form-control" 
+                           style="width: 70px; padding: 2px 4px; font-size: 11px; text-align: right;" 
+                           ${!isAPartir ? 'disabled' : 'readonly'}>
+                </div>
+            </div>
         `;
     });
+}
+
+function toggleInputAdicionalCheckin(id) {
+    const chk = document.querySelector(`.chk-checkin-adicional[value="${id}"]`);
+    const inputVal = document.getElementById(`inputValCheckinAdicional_${id}`);
+    if (chk && inputVal) {
+        const itemObj = servicosAdicionais.find(s => s.id === id);
+        if (itemObj && itemObj.a_partir) {
+            inputVal.readOnly = !chk.checked;
+        }
+    }
 }
 
 async function salvarCadastro(e) {
@@ -1137,7 +1177,6 @@ async function salvarCadastro(e) {
     }
 }
 
-// SALVAR CHECK-IN COM VÍNCULO DE ATENDENTE
 async function salvarCheckin() {
     if (!validarCaixaAberto()) return;
 
@@ -1169,13 +1208,26 @@ async function salvarCheckin() {
         const chkAdicionais = document.querySelectorAll('.chk-checkin-adicional:checked');
         let listaAdicionais = [];
         let valorTotalAdicionais = 0;
+        let erroPrecoMinimo = false;
 
         chkAdicionais.forEach(chk => {
-            const p = parseFloat(chk.getAttribute('data-preco')) || 0;
+            const id = chk.value;
+            const minPreco = parseFloat(chk.getAttribute('data-min-preco')) || 0;
+            const inputVal = document.getElementById(`inputValCheckinAdicional_${id}`);
+            const valorFinal = inputVal ? parseFloat(inputVal.value) || 0 : minPreco;
+
+            if (valorFinal < minPreco) {
+                alert(`O valor do adicional ${chk.getAttribute('data-nome')} não pode ser menor que R$ ${minPreco.toFixed(2)}.`);
+                erroPrecoMinimo = true;
+                return;
+            }
+
             const n = chk.getAttribute('data-nome');
-            listaAdicionais.push({ id: chk.value, nome: n, preco: p });
-            valorTotalAdicionais += p;
+            listaAdicionais.push({ id: id, nome: n, preco: valorFinal });
+            valorTotalAdicionais += valorFinal;
         });
+
+        if (erroPrecoMinimo) return;
 
         if (tipo === 'pacote') {
             const { data: pkgData } = await client
@@ -1203,7 +1255,7 @@ async function salvarCheckin() {
                 await client
                     .from('caixa_lancamentos')
                     .insert([{
-                        descricao: `Adicionais de Pacote (${listaAdicionais.map(a => a.nome).join(', ')}) - ${petObj ? petObj.nome : ''}`,
+                        descricao: `Adicionais de Pacote (${listaAdicionais.map(a => `${a.nome} R$ ${parseFloat(a.preco).toFixed(2)}`).join(', ')}) - ${petObj ? petObj.nome : ''}`,
                         forma_pagamento: "PIX",
                         valor: valorTotalAdicionais,
                         atendente_id: atendenteId
@@ -1308,7 +1360,6 @@ function filterServices(tipo, btn) {
     renderAtendimentos(tipo);
 }
 
-// VERIFICAR STATUS DO CAIXA NO BANCO E APLICAR RESTRIÇÕES DE PERFIL DE ACESSO
 async function checarStatusCaixa() {
     try {
         const client = getSupabase();
@@ -1343,7 +1394,6 @@ async function checarStatusCaixa() {
     }
 }
 
-// CONFIRMAR ABERTURA DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarAberturaCaixa() {
     if (!validarPermissaoAdmin()) return;
 
@@ -1371,7 +1421,6 @@ async function confirmarAberturaCaixa() {
     }
 }
 
-// CONFIRMAR SANGRIA DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarSangriaCaixa() {
     if (!validarPermissaoAdmin()) return;
     if (!caixaAtualSessao) {
@@ -1431,7 +1480,6 @@ async function confirmarSangriaCaixa() {
     }
 }
 
-// CONFIRMAR FECHAMENTO CEGO DE CAIXA (EXCLUSIVO ADMIN)
 async function confirmarFechamentoCaixa() {
     if (!validarPermissaoAdmin()) return;
 
@@ -1487,7 +1535,6 @@ async function confirmarFechamentoCaixa() {
     }
 }
 
-// CHECAR SESSÃO DE USUÁRIO
 function verificarSessaoUsuario() {
     const sessaoSalva = sessionStorage.getItem('petz_usuario');
     const modal = document.getElementById('modalLogin');
@@ -1501,7 +1548,6 @@ function verificarSessaoUsuario() {
     }
 }
 
-// REALIZAR LOGIN NO SUPABASE
 async function realizarLogin(e) {
     if (e) e.preventDefault();
 
@@ -1544,7 +1590,6 @@ async function realizarLogin(e) {
     }
 }
 
-// LOGOUT
 function fazerLogout() {
     if (confirm('Deseja realmente sair do sistema?')) {
         sessionStorage.removeItem('petz_usuario');
@@ -1553,7 +1598,6 @@ function fazerLogout() {
     }
 }
 
-// APLICAR PERMISSÕES DINÂMICAS DE SEGURANÇA E VISIBILIDADE DE BOTÕES
 function aplicarPermissoesPerfil() {
     if (!usuarioLogado) return;
 
@@ -1588,6 +1632,11 @@ function aplicarPermissoesPerfil() {
         input.disabled = !isAdmin;
     });
 
+    const chksAPartir = document.querySelectorAll('.chk-a-partir-adicional');
+    chksAPartir.forEach(chk => {
+        chk.disabled = !isAdmin;
+    });
+
     checarStatusCaixa();
 }
 
@@ -1599,7 +1648,6 @@ function validarPermissaoAdmin() {
     return true;
 }
 
-// HISTÓRICO DE CAIXAS
 async function carregarHistoricoCaixas() {
     const container = document.getElementById('historicoCaixasContainer');
     if (!container) return;
