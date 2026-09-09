@@ -44,8 +44,8 @@
             <form id="formLogin" onsubmit="realizarLogin(event)" style="margin-top: 15px;">
                 <div class="form-group" style="text-align: left;">
                     <label>E-mail do Usuário</label>
-                    <input type="email" id="loginEmail" class="form-control" required
-                        placeholder="admin@petzlandia.com.br">
+                    <input type="text" id="loginEmail" class="form-control" required
+                        placeholder="usuario@petzlandia.com.br" autocomplete="username">
                 </div>
                 <div class="form-group" style="text-align: left;">
                     <label>Senha</label>
@@ -131,7 +131,7 @@
                                 <div class="form-group">
                                     <label>WhatsApp / Telefone *</label>
                                     <input type="text" id="cadTutorFone" class="form-control" required
-                                        placeholder="(61) 98888-8888">
+                                        placeholder="(xx) 98888-8888" maxlength="15" oninput="mascaraTelefone(this)">
                                 </div>
                                 <div class="form-group">
                                     <label>Nome do Pet *</label>
@@ -170,8 +170,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label>E-mail de Login *</label>
-                                    <input type="email" id="cadUsuarioEmail" class="form-control" required
-                                        placeholder="ana@petzlandia.com">
+                                    <input type="text" id="cadUsuarioEmail" class="form-control" required
+                                        placeholder="ana@petzlandia.com.br">
                                 </div>
                                 <div class="form-group">
                                     <label>Senha de Acesso *</label>
@@ -552,7 +552,7 @@
             </div>
             <div class="form-group">
                 <label>E-mail de Login *</label>
-                <input type="email" id="editUsuarioEmail" class="form-control" required>
+                <input type="text" id="editUsuarioEmail" class="form-control" required>
             </div>
             <div class="form-group">
                 <label>Nova Senha (deixe em branco para manter a atual)</label>

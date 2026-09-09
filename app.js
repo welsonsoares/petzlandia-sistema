@@ -18,6 +18,24 @@ function getSupabase() {
     return _supabase;
 }
 
+// MÁSCARA AUTOMÁTICA DE TELEFONE (XX) 9XXXX-XXXX
+function mascaraTelefone(input) {
+    if (!input) return;
+    let v = input.value.replace(/\D/g, '');
+    if (v.length > 11) v = v.substring(0, 11);
+
+    if (v.length > 10) {
+        v = v.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+    } else if (v.length > 6) {
+        v = v.replace(/^(\d{2})(\d{4,5})(\d{0,4})$/, '($1) $2-$3');
+    } else if (v.length > 2) {
+        v = v.replace(/^(\d{2})(\d{0,5})$/, '($1) $2');
+    } else if (v.length > 0) {
+        v = v.replace(/^(\d*)/, '($1');
+    }
+    input.value = v;
+}
+
 // FUNÇÃO DE HIGIENIZAÇÃO DE ENTRADAS (XSS)
 function escapeHtml(texto) {
     if (!texto) return '';
@@ -165,7 +183,6 @@ function popularSelectsAtendentes() {
     });
 }
 
-// CARREGAR TUTORES EXISTENTES NO SELECT
 async function carregarTutoresSelect() {
     try {
         const client = getSupabase();
@@ -191,7 +208,6 @@ async function carregarTutoresSelect() {
     }
 }
 
-// SALVAR NOVO PET PARA TUTOR EXISTENTE
 async function salvarNovoPetTutorExistente() {
     const tutorId = document.getElementById('selectTutorExistente').value;
     const petNome = document.getElementById('cadNovoPetNome').value.trim();
@@ -229,7 +245,6 @@ async function salvarNovoPetTutorExistente() {
     }
 }
 
-// ABRIR HISTÓRICO A PARTIR DO SELECT DA MODAL DE CHECK-IN
 function abrirHistoricoPetSelecionadoCheckin() {
     const selPet = document.getElementById('selectPetCheckin');
     if (!selPet || !selPet.value) {
@@ -244,7 +259,6 @@ function abrirHistoricoPetSelecionadoCheckin() {
     abrirHistoricoPet(petId, petNome);
 }
 
-// CONSULTAR E EXIBIR HISTÓRICO COMPLETO E OBSERVAÇÕES DO PET (DO PRIMEIRO AO ÚLTIMO ATENDIMENTO)
 async function abrirHistoricoPet(petId, petNome) {
     const container = document.getElementById('historicoPetConteudo');
     const titulo = document.getElementById('historicoPetTitulo');
@@ -252,7 +266,6 @@ async function abrirHistoricoPet(petId, petNome) {
 
     if (!container) return;
 
-    // Eleva o z-index para garantir que a modal fique sempre no topo da tela
     if (modalHistorico) {
         modalHistorico.style.zIndex = '10000';
     }
@@ -265,7 +278,6 @@ async function abrirHistoricoPet(petId, petNome) {
         const client = getSupabase();
         if (!client) return;
 
-        // 1. Busca os dados e observações fixas do Pet e Tutor
         const { data: petData, error: errPet } = await client
             .from('pets')
             .select(`
@@ -296,7 +308,6 @@ async function abrirHistoricoPet(petId, petNome) {
             `;
         }
 
-        // 2. Busca todos os atendimentos desde o PRIMEIRO (ordem cronológica decrescente)
         const { data: atendimentosData, error: errAtend } = await client
             .from('atendimentos')
             .select(`
@@ -350,6 +361,37 @@ async function abrirHistoricoPet(petId, petNome) {
     } catch (e) {
         container.innerHTML = `<p style="color:#d32f2f;">Erro ao carregar histórico: ${e.message}</p>`;
     }
+}
+
+function notificarWhatsapp(tutorNome, fone, petNome, tipoEntrega = 'retirada') {
+    if (!fone || fone === 'undefined' || fone === 'null') {
+        alert('Telefone do tutor não cadastrado ou inválido.');
+        return;
+    }
+
+    let numLimpo = String(fone).replace(/\D/g, '');
+
+    if (!numLimpo) {
+        alert('Número de telefone inválido.');
+        return;
+    }
+
+    if (!numLimpo.startsWith('55') && numLimpo.length <= 11) {
+        numLimpo = '55' + numLimpo;
+    }
+
+    let textoMensagem = '';
+    const nomeTutorFormatado = tutorNome && tutorNome !== 'undefined' ? tutorNome : 'Tutor(a)';
+    const nomePetFormatado = petNome && petNome !== 'undefined' ? petNome : 'seu pet';
+
+    if (tipoEntrega === 'entrega') {
+        textoMensagem = `Olá ${nomeTutorFormatado}! O pet ${nomePetFormatado} já finalizou o serviço na Petz Lândia e nosso táxi pet já está se preparando para levá-lo de volta até você! 🚗🐾`;
+    } else {
+        textoMensagem = `Olá ${nomeTutorFormatado}! O pet ${nomePetFormatado} já finalizou o serviço na Petz Lândia e está prontinho esperando por você para ser buscado! 🐾`;
+    }
+
+    const msg = encodeURIComponent(textoMensagem);
+    window.open(`https://wa.me/${numLimpo}?text=${msg}`, '_blank');
 }
 
 function renderAtendimentos(filter = 'todos') {
@@ -449,10 +491,14 @@ async function salvarUsuarioAtendente(e) {
     if (e) e.preventDefault();
     if (!validarPermissaoAdmin()) return;
 
+    let email = document.getElementById('cadUsuarioEmail').value.trim().toLowerCase();
     const nome = document.getElementById('cadUsuarioNome').value.trim();
-    const email = document.getElementById('cadUsuarioEmail').value.trim();
     const senha = document.getElementById('cadUsuarioSenha').value.trim();
     const perfil = document.getElementById('cadUsuarioPerfil').value;
+
+    if (!email.includes('@')) {
+        email = email + '@petzlandia.com.br';
+    }
 
     if (!nome || !email || !senha) {
         alert('Por favor, preencha todos os campos obrigatórios.');
@@ -554,9 +600,13 @@ async function salvarEdicaoUsuario() {
 
     const id = document.getElementById('editUsuarioId').value;
     const nome = document.getElementById('editUsuarioNome').value.trim();
-    const email = document.getElementById('editUsuarioEmail').value.trim();
+    let email = document.getElementById('editUsuarioEmail').value.trim().toLowerCase();
     const senha = document.getElementById('editUsuarioSenha').value.trim();
     const perfil = document.getElementById('editUsuarioPerfil').value;
+
+    if (!email.includes('@')) {
+        email = email + '@petzlandia.com.br';
+    }
 
     if (!nome || !email) {
         alert('Nome e E-mail são obrigatórios.');
@@ -686,7 +736,6 @@ async function confirmarCheckoutAtendimento() {
         const client = getSupabase();
         if (!client) return;
 
-        // 1. Obtém o nome do usuário selecionado na tabela 'usuarios'
         const { data: usuarioData } = await client
             .from('usuarios')
             .select('nome')
@@ -695,7 +744,6 @@ async function confirmarCheckoutAtendimento() {
 
         const nomeAtendente = usuarioData ? usuarioData.nome : (usuarioLogado ? usuarioLogado.nome : '');
 
-        // 2. Busca o ID correspondente na tabela 'atendentes' pelo nome
         let atendenteId = null;
         if (nomeAtendente) {
             const { data: atendenteMatch } = await client
@@ -709,7 +757,6 @@ async function confirmarCheckoutAtendimento() {
             }
         }
 
-        // 3. Caso não encontre por nome, tenta usar o próprio ID do select se existir em 'atendentes'
         if (!atendenteId) {
             const { data: idDirectMatch } = await client
                 .from('atendentes')
@@ -722,7 +769,6 @@ async function confirmarCheckoutAtendimento() {
             }
         }
 
-        // 4. Se ainda não encontrar, seleciona o primeiro atendente ativo disponível
         if (!atendenteId) {
             const { data: primeiroAtendente } = await client
                 .from('atendentes')
@@ -1056,7 +1102,6 @@ async function populateSelects() {
         const client = getSupabase();
         if (!client) return;
 
-        // Busca pets trazendo os dados do tutor relacionado
         const { data, error } = await client
             .from('pets')
             .select(`
@@ -1421,7 +1466,6 @@ async function salvarCheckin() {
             return;
         }
 
-        // 1. Obtém o nome do usuário selecionado na tabela 'usuarios'
         const { data: usuarioData } = await client
             .from('usuarios')
             .select('nome')
@@ -1430,7 +1474,6 @@ async function salvarCheckin() {
 
         const nomeAtendente = usuarioData ? usuarioData.nome : (usuarioLogado ? usuarioLogado.nome : '');
 
-        // 2. Busca o ID correspondente na tabela 'atendentes' pelo nome exato
         let atendenteId = null;
         if (nomeAtendente) {
             const { data: atendenteMatch } = await client
@@ -1444,7 +1487,6 @@ async function salvarCheckin() {
             }
         }
 
-        // 3. Caso não encontre por nome, tenta usar o próprio ID do select se ele existir em 'atendentes'
         if (!atendenteId) {
             const { data: idDirectMatch } = await client
                 .from('atendentes')
@@ -1457,7 +1499,6 @@ async function salvarCheckin() {
             }
         }
 
-        // 4. Se ainda não encontrar, seleciona o primeiro atendente ativo disponível
         if (!atendenteId) {
             const { data: primeiroAtendente } = await client
                 .from('atendentes')
@@ -1833,8 +1874,17 @@ async function realizarLogin(e) {
 
     if (!emailInput || !senhaInput) return;
 
-    const email = emailInput.value.trim();
+    let emailDigitado = emailInput.value.trim().toLowerCase();
     const senha = senhaInput.value.trim();
+
+    if (!emailDigitado) {
+        alert('Informe o usuário de login.');
+        return;
+    }
+
+    if (!emailDigitado.includes('@')) {
+        emailDigitado = emailDigitado + '@petzlandia.com.br';
+    }
 
     try {
         const client = getSupabase();
@@ -1843,7 +1893,7 @@ async function realizarLogin(e) {
         const { data, error } = await client
             .from('usuarios')
             .select('*')
-            .eq('email', email)
+            .eq('email', emailDigitado)
             .eq('senha', senha);
 
         if (error || !data || data.length === 0) {
