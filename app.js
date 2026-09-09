@@ -1882,26 +1882,44 @@ async function realizarLogin(e) {
         return;
     }
 
+    // Se não tiver @, concatena o domínio padrão
     if (!emailDigitado.includes('@')) {
         emailDigitado = emailDigitado + '@petzlandia.com.br';
     }
 
     try {
         const client = getSupabase();
-        if (!client) return;
+        if (!client) {
+            alert('Erro: Supabase não foi inicializado corretamente.');
+            return;
+        }
 
+        // Busca o usuário no banco (com ilike para ignorar maiúsculas/minúsculas)
         const { data, error } = await client
             .from('usuarios')
             .select('*')
-            .eq('email', emailDigitado)
+            .ilike('email', emailDigitado)
             .eq('senha', senha);
 
-        if (error || !data || data.length === 0) {
-            alert('E-mail ou senha inválidos!');
+        if (error) {
+            console.error('Erro na consulta Supabase:', error);
+            alert('Erro de conexão/permissão com o banco de dados: ' + error.message);
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            console.warn(`Tentativa de login falhou para: ${emailDigitado}`);
+            alert(`Usuário ou senha inválidos!\n\nE-mail buscado: ${emailDigitado}`);
             return;
         }
 
         usuarioLogado = data[0];
+
+        if (usuarioLogado.ativo === false) {
+            alert('Este usuário está inativo no sistema.');
+            return;
+        }
+
         sessionStorage.setItem('petz_usuario', JSON.stringify(usuarioLogado));
 
         const modal = document.getElementById('modalLogin');
@@ -1913,6 +1931,7 @@ async function realizarLogin(e) {
         alert(`Bem-vindo(a), ${usuarioLogado.nome}!`);
 
     } catch (err) {
+        console.error('Exceção ao realizar login:', err);
         alert('Erro ao realizar login: ' + err.message);
     }
 }
