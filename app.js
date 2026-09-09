@@ -1409,7 +1409,7 @@ async function salvarCheckin() {
             return;
         }
 
-        // 1. Busca os dados do usuário selecionado no select (para obter o nome exato)
+        // 1. Obtém o nome do usuário selecionado na tabela 'usuarios'
         const { data: usuarioData } = await client
             .from('usuarios')
             .select('nome')
@@ -1418,8 +1418,8 @@ async function salvarCheckin() {
 
         const nomeAtendente = usuarioData ? usuarioData.nome : (usuarioLogado ? usuarioLogado.nome : '');
 
-        // 2. Busca o ID correspondente pelo NOME na tabela 'atendentes'
-        let atendenteId = usuarioSelectId;
+        // 2. Busca o ID correspondente na tabela 'atendentes' pelo nome exato
+        let atendenteId = null;
         if (nomeAtendente) {
             const { data: atendenteMatch } = await client
                 .from('atendentes')
@@ -1430,6 +1430,37 @@ async function salvarCheckin() {
             if (atendenteMatch && atendenteMatch.length > 0) {
                 atendenteId = atendenteMatch[0].id;
             }
+        }
+
+        // 3. Caso não encontre por nome, tenta usar o próprio ID do select se ele existir em 'atendentes'
+        if (!atendenteId) {
+            const { data: idDirectMatch } = await client
+                .from('atendentes')
+                .select('id')
+                .eq('id', usuarioSelectId)
+                .limit(1);
+
+            if (idDirectMatch && idDirectMatch.length > 0) {
+                atendenteId = idDirectMatch[0].id;
+            }
+        }
+
+        // 4. Se ainda não encontrar, seleciona o primeiro atendente ativo disponível
+        if (!atendenteId) {
+            const { data: primeiroAtendente } = await client
+                .from('atendentes')
+                .select('id')
+                .eq('ativo', true)
+                .limit(1);
+
+            if (primeiroAtendente && primeiroAtendente.length > 0) {
+                atendenteId = primeiroAtendente[0].id;
+            }
+        }
+
+        if (!atendenteId) {
+            alert('Erro: Nenhum atendente válido foi encontrado no banco de dados. Verifique a tabela atendentes.');
+            return;
         }
 
         const petId = parseInt(petSelect.value);
